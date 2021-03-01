@@ -38,7 +38,7 @@ def follow_twins(self):
         try:
             # follow twin's feed
             subscription_id = self.follow_api.subscribe_to_feed(
-                self.follower_twin_id, twin.id.value, 'random_letter_feed', self.follow_callback
+                self.follower_twin_id, twin.id.value, 'random_temperature_feed', self.follow_callback
             )
 ```
 
@@ -46,10 +46,10 @@ def follow_twins(self):
 ```python
 def follow_callback(header, body):  # pylint: disable=W0613
     decoded_data = base64.b64decode(body.payload.feed_data.data).decode('ascii')
-    letter = json.loads(decoded_data)
+    temperature = json.loads(decoded_data)
     timestamp = body.payload.feed_data.occurred_at.isoformat()
 
-    logger.info('Received data %s at time %s', letter, timestamp)
+    logger.info('Received temperature data %s at time %s', temperature, timestamp)
 ```
 
 ### Repeatedly searches to find and follow new twins
