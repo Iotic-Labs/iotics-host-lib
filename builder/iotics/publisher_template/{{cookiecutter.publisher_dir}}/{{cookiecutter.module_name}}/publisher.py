@@ -110,7 +110,7 @@ class {{cookiecutter.publisher_class_name}}:
         try:
             base64_encoded_data = base64.b64encode(json_data.encode()).decode()
         except TypeError as err:
-            raise RandomLetPublisherBaseException(
+            raise {{cookiecutter.publisher_class_name}}BaseException(
                 f'Can not encode data to share from {twin_id}/{feed_name}: {err}, {json_data}'
             ) from err
 
