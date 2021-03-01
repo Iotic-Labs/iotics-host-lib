@@ -9,7 +9,7 @@ In addition this library also provides a way for developers to generate boilerpl
 
 By the end of following the steps in this README and selecting to add example code, then next following the steps in the READMEs of the generated Connectors, you will have created and run a fully functioning example. This example demonstrates the basics of publishing data into Iotics and receiving data out of Iotics.
 
-The example publisher Connector creates a twin and shares random letters, the example follower Connector creates its own twin then finds and follows the publisher twin's feed logging the letters as they are shared by the publisher. The READMEs in the folders of the two Connectors that you create point out the important parts of the Connector's code and guide you through building and running the Connectors.
+The example publisher Connector creates a twin and shares random temperatures, the example follower Connector creates its own twin then finds and follows the publisher twin's feed logging the temperatures as they are shared by the publisher. The READMEs in the folders of the two Connectors that you create point out the important parts of the Connector's code and guide you through building and running the Connectors.
 
 The symmetry of the publisher and the follower having their own twins allows their interaction to be brokered and so provides an extra level of security - for more details please refer to the Iotics [Key Concepts](https://docs.iotics.com/docs/key-concepts#brokered-interactions) documentation.
 
@@ -45,12 +45,12 @@ then follow instructions on terminal.
 ```bash
 $ cookiecutter builder/iotics/publisher_template/
 
-project_name [A project name used in the doc (ex: Random Letter Generator)]: Random Letter Generator
-publisher_dir [publisher_directory_name (ex: random-let-pub)]: random-let-pub
+project_name [A project name used in the doc (ex: Random Temperature Generator)]: Random Temperature Generator
+publisher_dir [publisher_directory_name (ex: random-temp-pub)]: random-temp-pub
 module_name [python module name (ex: randpub)]: randpub
 command_name [command line name (ex: run-randpub)]: run-randpub
 conf_env_var_prefix [conf environment variable prefix (ex: RANDPUB_)]: RANDPUB_
-publisher_class_name [publisher class name (ex: RandomLetPublisher)]: RandomLetPublisher
+publisher_class_name [publisher class name (ex: RandomTempPublisher)]: RandomTempPublisher
 Select add_example_code:
 1 - YES
 2 - NO
@@ -59,7 +59,7 @@ Choose from 1, 2 [1]: 1
 The following structure is created:
 
 ```bash
-├── random-let-pub
+├── random-temp-pub
 │   ├── Dockerfile
 │   ├── Makefile
 │   ├── randpub
