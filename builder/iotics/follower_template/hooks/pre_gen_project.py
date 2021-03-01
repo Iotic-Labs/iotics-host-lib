@@ -10,11 +10,11 @@ use the space for defaults in the variable prompts to provide user help, and the
 defaults here. Support for actual variable help strings in cookiecutter is planned here:
 https://github.com/cookiecutter/cookiecutter/issues/794#issuecomment-455642359
 
-{% if cookiecutter.project_name == "A project name used in the doc (ex: Random Letter Generator)" %}
-{{ cookiecutter.update({"project_name": "Random Letter Generator" }) }}
+{% if cookiecutter.project_name == "A project name used in the doc (ex: Random Temperature Follower)" %}
+{{ cookiecutter.update({"project_name": "Random Temperature Follower" }) }}
 {% endif %}
-{% if cookiecutter.follower_dir == "follower directory name (ex: random-let-fol)" %}
-{{ cookiecutter.update({"follower_dir": "random-let-fol" }) }}
+{% if cookiecutter.follower_dir == "follower directory name (ex: random-temp-fol)" %}
+{{ cookiecutter.update({"follower_dir": "random-temp-fol" }) }}
 {% endif %}
 {% if cookiecutter.module_name == "python module name (ex: randfol)" %}
 {{ cookiecutter.update({"module_name": "randfol" }) }}
@@ -25,8 +25,8 @@ https://github.com/cookiecutter/cookiecutter/issues/794#issuecomment-455642359
 {% if cookiecutter.conf_env_var_prefix == "conf environment variable prefix (ex: RANDFOL_)" %}
 {{ cookiecutter.update({"conf_env_var_prefix": "RANDFOL_" }) }}
 {% endif %}
-{% if cookiecutter.follower_class_name == "follower class name (ex: RandomLetFollower)" %}
-{{ cookiecutter.update({"follower_class_name": "RandomLetFollower" }) }}
+{% if cookiecutter.follower_class_name == "follower class name (ex: RandomTempFollower)" %}
+{{ cookiecutter.update({"follower_class_name": "RandomTempFollower" }) }}
 {% endif %}
 """
 

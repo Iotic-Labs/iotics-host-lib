@@ -73,10 +73,10 @@ class {{cookiecutter.follower_class_name}}:
     @staticmethod
     def follow_callback(header, body):  # pylint: disable=W0613
         decoded_data = base64.b64decode(body.payload.feed_data.data).decode('ascii')
-        letter = json.loads(decoded_data)
+        temperature = json.loads(decoded_data)
         timestamp = body.payload.feed_data.occurred_at.isoformat()
 
-        logger.info('Received data %s at time %s', letter, timestamp)
+        logger.info('Received temperature data %s at time %s', temperature, timestamp)
 
     def follow_twins(self):
         """Find and follow twins"""
@@ -85,9 +85,9 @@ class {{cookiecutter.follower_class_name}}:
         try:
             found_twins = self.search_api.search_twins(text='Random')
         except DataSourcesSearchTimeout as timeout_ex:
-            logger.warning('Timed out searching for entities: %s', timeout_ex)
+            logger.warning('Timed out searching for twins: %s', timeout_ex)
         except DataSourcesStompError as ex:
-            logger.error('Error searching for entities: %s', ex)
+            logger.error('Error searching for twins: %s', ex)
         except DataSourcesStompNotConnected:
             logger.warning('Cant search for twins, stomp not currently connected')
 
@@ -101,14 +101,14 @@ class {{cookiecutter.follower_class_name}}:
             try:
                 # follow twin's feed
                 subscription_id = self.follow_api.subscribe_to_feed(
-                    self.follower_twin_id, twin.id.value, 'random_letter_feed', self.follow_callback
+                    self.follower_twin_id, twin.id.value, 'random_temperature_feed', self.follow_callback
                 )
             except DataSourcesStompNotConnected:
                 logger.warning('Cant follow twin, stomp not currently connected')
                 break
 
             if subscription_id:
-                logger.info('Subscribed to feed on entity %s', twin.id.value)
+                logger.info('Subscribed to feed on twin %s', twin.id.value)
 
     def run(self):
         logger.info('Follower started')
