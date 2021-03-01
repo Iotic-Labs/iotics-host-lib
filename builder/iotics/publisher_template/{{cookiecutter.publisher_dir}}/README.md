@@ -50,6 +50,7 @@ def _set_feed_meta(self, twin_id: str, feed_name: str):
         twin_id, feed_name,
         add_labels=[LangLiteral(value=label, lang='en')],
         add_comments=[LangLiteral(value=description, lang='en')],
+        # Whether this feed's most recent data can be retrieved via the InterestApi
         store_last=True,
         add_tags=['random', 'awesome'],
         add_values=[

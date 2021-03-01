@@ -95,6 +95,7 @@ class {{cookiecutter.publisher_class_name}}:
             twin_id, feed_name,
             add_labels=[LangLiteral(value=label, lang='en')],
             add_comments=[LangLiteral(value=description, lang='en')],
+            # Whether this feed's most recent data can be retrieved via the InterestApi
             store_last=True,
             add_tags=['random', 'awesome'],
             add_values=[
