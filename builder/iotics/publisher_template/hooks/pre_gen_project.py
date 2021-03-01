@@ -10,11 +10,11 @@ use the space for defaults in the variable prompts to provide user help, and the
 defaults here. Support for actual variable help strings in cookiecutter is planned here:
 https://github.com/cookiecutter/cookiecutter/issues/794#issuecomment-455642359
 
-{% if cookiecutter.project_name == "A project name used in the doc (ex: Random Letter Generator)" %}
-{{ cookiecutter.update({"project_name": "Random Letter Generator" }) }}
+{% if cookiecutter.project_name == "A project name used in the doc (ex: Random Temperature Generator)" %}
+{{ cookiecutter.update({"project_name": "Random Temperature Generator" }) }}
 {% endif %}
-{% if cookiecutter.publisher_dir == "publisher directory name (ex: random-let-pub)" %}
-{{ cookiecutter.update({"publisher_dir": "random-let-pub" }) }}
+{% if cookiecutter.publisher_dir == "publisher directory name (ex: random-temp-pub)" %}
+{{ cookiecutter.update({"publisher_dir": "random-temp-pub" }) }}
 {% endif %}
 {% if cookiecutter.module_name == "python module name (ex: randpub)" %}
 {{ cookiecutter.update({"module_name": "randpub" }) }}
@@ -25,8 +25,8 @@ https://github.com/cookiecutter/cookiecutter/issues/794#issuecomment-455642359
 {% if cookiecutter.conf_env_var_prefix == "conf environment variable prefix (ex: RANDPUB_)" %}
 {{ cookiecutter.update({"conf_env_var_prefix": "RANDPUB_" }) }}
 {% endif %}
-{% if cookiecutter.publisher_class_name == "publisher class name (ex: RandomLetPublisher)" %}
-{{ cookiecutter.update({"publisher_class_name": "RandomLetPublisher" }) }}
+{% if cookiecutter.publisher_class_name == "publisher class name (ex: RandomTempPublisher)" %}
+{{ cookiecutter.update({"publisher_class_name": "RandomTempPublisher" }) }}
 {% endif %}
 """
 

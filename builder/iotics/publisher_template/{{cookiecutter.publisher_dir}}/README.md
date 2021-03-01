@@ -1,7 +1,7 @@
 # {{cookiecutter.project_name}}
 
 {% if cookiecutter.add_example_code == "YES" %}
-The example code creates a twin and a feed on that twin and publishes a random letter to that feed, the publishing frequency is set by configuration.
+The example code creates a twin and a feed on that twin and publishes a random temperature in Celsius to that feed, the publishing frequency is set by configuration.
 {% else %}
 TODO: summary
 {% endif %}
@@ -37,13 +37,13 @@ def _set_twin_meta(self, twin_id: str):
 ```python
 def _create_feed(self, twin_id: str) -> str:
     api = self.qapi_factory.get_feed_api()
-    feed_name = 'random_letter_feed'
+    feed_name = 'random_temperature_feed'
     api.create_feed(twin_id, feed_name)
     return feed_name
 
 def _set_feed_meta(self, twin_id: str, feed_name: str):
-    label = 'Random letter feed'
-    description = f'Awesome feed generating a letter each {self.update_frequency_seconds} seconds'
+    label = 'Random temperature feed'
+    description = f'Awesome feed generating a temperature in Celsius each {self.update_frequency_seconds} seconds'
     api = self.qapi_factory.get_feed_api()
 
     api.update_feed(
@@ -53,7 +53,10 @@ def _set_feed_meta(self, twin_id: str, feed_name: str):
         store_last=True,
         add_tags=['random', 'awesome'],
         add_values=[
-            Value(label='letter', data_type=BasicDataTypes.STRING.value, comment='a random letter'),
+            Value(label='temp',
+                  data_type=BasicDataTypes.DECIMAL.value,
+                  comment='a random temperature in Celsius',
+                  unit='http://purl.obolibrary.org/obo/UO_0000027'),
         ]
     )
 ```
@@ -62,20 +65,21 @@ def _set_feed_meta(self, twin_id: str, feed_name: str):
 ```python
 def _share_feed_data(self, twin_id: str, feed_name: str):
     non_encoded_data = {
-        'letter': random.choice(string.ascii_letters)
+        'temp': round(random.uniform(-10.0, 45.0), 2)
     }
     json_data = json.dumps(non_encoded_data)
     try:
         base64_encoded_data = base64.b64encode(json_data.encode()).decode()
     except TypeError as err:
-        raise RandomLetPublisherBaseException(
+        raise RandomTempPublisherBaseException(
             f'Can not encode data to share from {twin_id}/{feed_name}: {err}, {json_data}'
         ) from err
 
     api = self.qapi_factory.get_feed_api()
     api.share_feed_data(
         twin_id, feed_name,
-        data=base64_encoded_data, mime='application/json'
+        data=base64_encoded_data, mime='application/json',
+        occurred_at=datetime.now(tz=timezone.utc).isoformat()
     )
 
     return non_encoded_data
