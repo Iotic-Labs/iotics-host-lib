@@ -61,6 +61,7 @@ class {{cookiecutter.follower_class_name}}:
         self.twin_api = qapi_factory.get_twin_api()
         self.search_api = qapi_factory.get_search_api()
         self.follow_api = qapi_factory.get_follow_api()
+        self.interest_api = qapi_factory.get_interest_api()
         self.agent_auth = agent_auth
         self.loop_time = update_frequency_seconds
         self.follower_twin_id = None
@@ -77,6 +78,18 @@ class {{cookiecutter.follower_class_name}}:
         timestamp = body.payload.feed_data.occurred_at.isoformat()
 
         logger.info('Received temperature data %s at time %s', temperature, timestamp)
+
+    def get_most_recent_data(self, followed_twin_id: str, feed_id: str):
+        """ Get feed's most recent data via the InterestApi
+            Note: the feed metadata must include store_last=True
+        """
+        logger.info('Get most recent data via InterestApi')
+        most_recent_data = self.interest_api.get_feed_last_stored(follower_twin_id=self.follower_twin_id,
+                                                                  followed_twin_id=followed_twin_id,
+                                                                  feed_id=feed_id)
+        decoded_data = base64.b64decode(most_recent_data.feed_data.data).decode()
+        temperature = json.loads(decoded_data)
+        logger.info('Most recent data %s', temperature)
 
     def follow_twins(self):
         """Find and follow twins"""
@@ -109,6 +122,9 @@ class {{cookiecutter.follower_class_name}}:
 
             if subscription_id:
                 logger.info('Subscribed to feed on twin %s', twin.id.value)
+                # Optional call to get the feed's most recent data via the InterestApi
+                # This call is not needed to perform a follow
+                self.get_most_recent_data(twin.id.value, 'random_temperature_feed')
 
     def run(self):
         logger.info('Follower started')
