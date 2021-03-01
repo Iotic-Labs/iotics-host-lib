@@ -78,6 +78,7 @@ class {{cookiecutter.publisher_class_name}}:
             add_labels=[LangLiteral(value=label, lang='en')],
             add_comments=[LangLiteral(value=description, lang='en')]
         )
+        logging.info('Created Twin %s', api.describe_twin(twin_id=twin_id))
 
     def _create_feed(self, twin_id: str) -> str:
         api = self.qapi_factory.get_feed_api()
@@ -103,6 +104,7 @@ class {{cookiecutter.publisher_class_name}}:
                       unit='http://purl.obolibrary.org/obo/UO_0000027'),
             ]
         )
+        logging.info('Created Feed %s', api.describe_feed(twin_id=twin_id, feed_id=feed_name))
 
     def _share_feed_data(self, twin_id: str, feed_name: str):
         non_encoded_data = {
