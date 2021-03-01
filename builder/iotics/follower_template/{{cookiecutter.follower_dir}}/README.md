@@ -64,6 +64,23 @@ def run(self):
         sleep(self.loop_time)
 ```
 
+### Get feed's most recent data via the InterestApi
+> Get most recent data is available via the InterestApi if the followed feed has the tag `store_last` set to `True`
+> (cf. publisher example)
+```python
+def get_most_recent_data(self, followed_twin_id: str, feed_id: str):
+    """ Get feed's most recent data via the InterestApi
+        Note: the feed metadata must include store_last=True
+    """
+    logger.info('Get most recent data via InterestApi')
+    most_recent_data = self.interest_api.get_feed_last_stored(follower_twin_id=self.follower_twin_id,
+                                                              followed_twin_id=followed_twin_id,
+                                                              feed_id=feed_id)
+    decoded_data = base64.b64decode(most_recent_data.feed_data.data).decode()
+    temperature = json.loads(decoded_data)
+    logger.info('Most recent data %s', temperature)
+```
+
 In `conf.py`:
 
 ### Adds a configurable search frequency
