@@ -1,14 +1,13 @@
-from collections import namedtuple
 import contextlib
+import json
+from collections import namedtuple
 from functools import wraps
 from http import HTTPStatus
 from typing import List, T, Tuple, Union
 
 from shortuuid import uuid
-from iotic.web.rest.client.qapi import ApiClient, ApiException
+from iotic.web.rest.client.qapi import ApiClient, ApiException, RpcStatus
 from iotics.host.exceptions import DataSourcesQApiError, DataSourcesQApiHttpError
-
-
 ListOrTuple = Union[List[T], Tuple[T, ...]]
 
 
@@ -61,3 +60,12 @@ def deserialize(body, response_type):
 
 def sanitize_for_serialization(payload):
     return _API_CLIENT.sanitize_for_serialization(payload)
+
+
+def get_stomp_error_message(error_body: str) -> str:
+    # Compatibility with host before version 2.0.386
+    error = json.loads(error_body).get('error')
+    if error:
+        return error
+    rpc_status = _API_CLIENT.deserialize(Resp(error_body), RpcStatus)
+    return rpc_status.message
