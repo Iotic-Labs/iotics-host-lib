@@ -15,7 +15,7 @@ from retry import retry
 from stomp import ConnectionListener
 from stomp.exception import StompException
 
-from iotics.host.api.utils import deserialize, ListOrTuple, sanitize_for_serialization
+from iotics.host.api.utils import deserialize, ListOrTuple, sanitize_for_serialization, get_stomp_error_message
 from iotics.host.auth import AgentAuth
 from iotics.host.conf.base import DataSourcesConfBase
 from iotics.host.exceptions import DataSourcesQApiError, DataSourcesSearchTimeout, DataSourcesStompError, \
@@ -76,7 +76,7 @@ class SearchStompListener(ConnectionListener):
         logger.error('Received search stomp error body: %s headers: %s', body, headers)
         try:
             # This will be improved once https://ioticlabs.atlassian.net/browse/FO-1889 will be done
-            error = json.loads(body).get('error', 'No error body')
+            error = get_stomp_error_message(body) or 'No error body'
             if error in (
                     'UNAUTHENTICATED: token expired', 'The connection frame does not contain valid credentials.'
             ):
