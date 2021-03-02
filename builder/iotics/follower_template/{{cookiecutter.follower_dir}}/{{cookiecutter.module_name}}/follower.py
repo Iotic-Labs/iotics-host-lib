@@ -25,6 +25,7 @@ from iotics.host.exceptions import (
     DataSourcesConfigurationError, DataSourcesError, DataSourcesSearchTimeout,
     DataSourcesStompError, DataSourcesStompNotConnected
 )
+from iotic.web.rest.client.qapi import ModelProperty, Uri
 {% else %}
 import logging
 from uuid import uuid4
@@ -81,7 +82,7 @@ class {{cookiecutter.follower_class_name}}:
 
     def get_most_recent_data(self, followed_twin_id: str, feed_id: str):
         """ Get feed's most recent data via the InterestApi
-            Note: the feed metadata must include store_last=True
+            Note: the feed meta data must include store_last=True
         """
         logger.info('Get most recent data via InterestApi')
         most_recent_data = self.interest_api.get_feed_last_stored(follower_twin_id=self.follower_twin_id,
@@ -96,7 +97,10 @@ class {{cookiecutter.follower_class_name}}:
         found_twins = None
         logger.info('Searching for twins.')
         try:
-            found_twins = self.search_api.search_twins(text='Random')
+            # Searching Semantically - run a search for all the twins identified with the Temperature category
+            temperature_property = ModelProperty(key='http://data.iotics.com/ns/category',
+                                                 uri_value=Uri(value='http://data.iotics.com/category/Temperature'))
+            found_twins = self.search_api.search_twins(properties=[temperature_property])
         except DataSourcesSearchTimeout as timeout_ex:
             logger.warning('Timed out searching for twins: %s', timeout_ex)
         except DataSourcesStompError as ex:
