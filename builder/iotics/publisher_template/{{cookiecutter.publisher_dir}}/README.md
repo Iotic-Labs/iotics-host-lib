@@ -26,27 +26,37 @@ def _set_twin_meta(self, twin_id: str):
     description = 'Awesome twin for random data'
     api = self.qapi_factory.get_twin_api()
     # Adding Semantic Meta data via property usage.
-    # Here we are setting a "Category" property to this twin        
-    # The twin is identified as a "Temperature" twin
+    # Here we are setting a "Category" property to this twin.
+    # The twin is identified as a "Temperature" twin.
     category_property = ModelProperty(key='http://data.iotics.com/ns/category',
                                       uri_value=Uri(value='http://data.iotics.com/category/Temperature'))
 
+    # Set twin location to London
+    # This will make the twin visible in Iotics Cloud and it will enable the search by location.
+    london_location = GeoLocationUpdate(location=GeoLocation(lat=51.507359, lon=-0.136439))
     api.update_twin(
         twin_id,
         add_tags=['random', 'awesome'],
         add_labels=[LangLiteral(value=label, lang='en')],
         add_comments=[LangLiteral(value=description, lang='en')],
-        add_props=[category_property]
+        add_props=[category_property],
+        location=london_location,
     )
 ```
 #### Adding semantic meta data via property usage
 
-In the code snippet above, a property is added to the twin. This will allow semantic search based
+In the code snippet above, a property is added to the twin meta data. This will allow semantic search based
 on a set of properties. You can see the follower doing this type of search in 
 its `Semantic searches for and follows twins` section.
 Read more about properties in the Iotics documentation:
 - [What is an IOTICS Digital Twin?](https://docs.iotics.com/docs/key-concepts#what-is-an-iotics-digital-twin)
 - [Properties](https://docs.iotics.com/docs/setting-up-a-digital-twin#properties)
+
+#### Getting started with Iotics Cloud
+In the code snippet above, the London location is added to the twin meta data.
+This will make the twin visible in Iotics Cloud.
+Read more about Iotics Cloud in the Iotics documentation: [Getting started with Iotics Cloud](https://docs.iotics.com/docs/getting-started-with-iotics-cloud)
+
 
 ### Creates a feed and sets its meta data
 ```python
