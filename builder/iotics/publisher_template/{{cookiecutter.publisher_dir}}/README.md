@@ -25,13 +25,26 @@ def _set_twin_meta(self, twin_id: str):
     label = 'Random awesome twin'
     description = 'Awesome twin for random data'
     api = self.qapi_factory.get_twin_api()
+
+    # Set twin location to London
+    # This will make the twin visible in Iotics Cloud and it will enable the search by location.
+    london_location = GeoLocationUpdate(location=GeoLocation(lat=51.507359, lon=-0.136439))
+
     api.update_twin(
         twin_id,
         add_tags=['random', 'awesome'],
         add_labels=[LangLiteral(value=label, lang='en')],
-        add_comments=[LangLiteral(value=description, lang='en')]
+        add_comments=[LangLiteral(value=description, lang='en')],
+        location=london_location,
     )
 ```
+
+#### Getting started with Iotics Cloud
+In the code snippet above, the London location is added to the twin meta data.
+This will make the twin visible in Iotics Cloud.
+Read more about Iotics Cloud in the Iotics documentation: [Getting started with Iotics Cloud](https://docs.iotics.com/docs/getting-started-with-iotics-cloud)
+
+
 #### Adding semantic meta data via property usage
 
 In the code snippet below, a property is added to the twin while setting the meta data.
