@@ -45,7 +45,7 @@ def follow_twins(self):
 
 
 ### Semantic based searches for and follows twins
-This search will return the twins identified with the *Category Temperature* (ie it will return the twins 
+This search will return the twins identified with the *Temperature Category* (ie it will return the twins
 including this Category in their meta data properties).
 You can see the publisher adding such a category to the twins it creates in its `Creates a twin and sets its meta data` section.
 
