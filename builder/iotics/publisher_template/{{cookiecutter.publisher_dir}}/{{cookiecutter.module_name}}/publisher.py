@@ -21,8 +21,7 @@ import time
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from iotic.web.rest.client.qapi import LangLiteral
-from iotic.web.rest.client.qapi.models.value import Value
+from iotic.web.rest.client.qapi import LangLiteral, Value, GeoLocationUpdate, GeoLocation
 from iotics.host.api.data_types import BasicDataTypes
 {% else %}
 import logging
@@ -72,11 +71,17 @@ class {{cookiecutter.publisher_class_name}}:
         label = 'Random awesome twin'
         description = 'Awesome twin for random data'
         api = self.qapi_factory.get_twin_api()
+
+        # Set twin location to London
+        # This will make the twin visible in Iotics Cloud and it will enable the search by location.
+        london_location = GeoLocationUpdate(location=GeoLocation(lat=51.507359, lon=-0.136439))
+
         api.update_twin(
             twin_id,
             add_tags=['random', 'awesome'],
             add_labels=[LangLiteral(value=label, lang='en')],
-            add_comments=[LangLiteral(value=description, lang='en')]
+            add_comments=[LangLiteral(value=description, lang='en')],
+            location=london_location,
         )
         logging.info('Created Twin %s', api.describe_twin(twin_id=twin_id))
 
