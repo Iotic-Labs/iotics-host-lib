@@ -153,21 +153,37 @@ pip install -U pip setuptools
 
 ## Running locally
 
-**Create yourself a user key and some credentials for this component**
+
+### Create yourself credentials for this component
+Run `gen_creds.py` script from the `iotics-host-lib` directory to generate:
+- **USER SEED** used to generate and retrieve your user DID,
+- **USER DID** required by all your connectors to run and connect to Iotics host,
+- **AGENT SEED** a unique seed required for each of your connector.
+
+More info about DIDs can be found on [docs.iotics.com](docs.iotics.com).
 
 ```bash
-# Create user seed, if you haven't already created a user seed e.g. in the publisher, in which case just use that seed
-docker run --env RESOLVER="[address of resolver]" quay.io/iotic_labs/ioticsctl create seed
-#> [user seed e.g. abcdef1234...]
-docker run --env RESOLVER="[address of resolver]" quay.io/iotic_labs/ioticsctl create did --seed [user seed e.g. abcdef1234] --purpose user --number 0
-#> DID Created: [user id e.g. did:iotics:xyz54321...]
-docker run --env RESOLVER="[address of resolver]" quay.io/iotic_labs/ioticsctl wizard create --type agent --name follower-agent --seed [user seed e.g. abcdef1234] --purpose user --number 0
-#> Created agent with ID [e.g. did:iotics:aaa111...] and delegated by user ID [e.g. did:iotics:xyz54321...]
-#> SEED: [agent seed e.g. lmnop5678...]
+# Create a virtual environment:
+python3 -mvenv venv
+source venv/bin/activate
+pip install -U pip setuptools
+pip install -f deps iotic.lib.identity
+# or use an existing one and then call:
+./scripts/gen_creds.py
 ```
+Once the script successfully completes, take a note of variables for your component:
+```bash
+export RESOLVER_HOST=https://your.resolver
+export HOST_USER=did:iotics:iot1234567890aBcDeFgHiJkLmNoPQrStUvW
+export SEED=000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+```
+Those should be kept safe and be present in the environment in which you are running your connector.  
+If you are using the same user for a publisher component and a follower component, you can reuse the same
+USER SEED, but **note that this should NOT be stored in production environment with your component,
+instead keep it safe and secure elsewhere**. The seed can be stored and recognised by the `gen_creds.py`.
 
-**Run locally**
 
+### Run component
 ```bash
 cd ./{{cookiecutter.follower_dir}}
 # then export some environment variables
