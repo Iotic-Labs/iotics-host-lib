@@ -1,0 +1,151 @@
+# {{cookiecutter.project_name}}
+
+{% if cookiecutter.add_example_code == "YES" %}
+The example code creates a twin and a feed on that twin and publishes a random letter to that feed, the publishing frequency is set by configuration.
+{% else %}
+TODO: summary
+{% endif %}
+
+## Context
+{% if cookiecutter.add_example_code == "YES" %}
+In `publisher.py` the example:
+
+### Creates a twin and sets its meta data
+```python
+def _create_twin(self) -> str:
+    # Create an twin id in the registerer
+    twin_id, _, _ = self.agent_auth.make_twin_id(TWIN_NAME)
+
+    # Create the twin
+    api = self.qapi_factory.get_twin_api()
+    api.create_twin(twin_id)
+    return twin_id
+
+def _set_twin_meta(self, twin_id: str):
+    label = 'Random awesome twin'
+    description = 'Awesome twin for random data'
+    api = self.qapi_factory.get_twin_api()
+    api.update_twin(
+        twin_id,
+        add_tags=['random', 'awesome'],
+        add_labels=[LangLiteral(value=label, lang='en')],
+        add_comments=[LangLiteral(value=description, lang='en')]
+    )
+```
+
+### Creates a feed and sets its meta data
+```python
+def _create_feed(self, twin_id: str) -> str:
+    api = self.qapi_factory.get_feed_api()
+    feed_name = 'random_letter_feed'
+    api.create_feed(twin_id, feed_name)
+    return feed_name
+
+def _set_feed_meta(self, twin_id: str, feed_name: str):
+    label = 'Random letter feed'
+    description = f'Awesome feed generating a letter each {self.update_frequency_seconds} seconds'
+    api = self.qapi_factory.get_feed_api()
+
+    api.update_feed(
+        twin_id, feed_name,
+        add_labels=[LangLiteral(value=label, lang='en')],
+        add_comments=[LangLiteral(value=description, lang='en')],
+        store_last=True,
+        add_tags=['random', 'awesome'],
+        add_values=[
+            Value(label='letter', data_type=BasicDataTypes.STRING.value, comment='a random letter'),
+        ]
+    )
+```
+
+### Publishes data to the feed
+```python
+def _share_feed_data(self, twin_id: str, feed_name: str):
+    non_encoded_data = {
+        'letter': random.choice(string.ascii_letters)
+    }
+    json_data = json.dumps(non_encoded_data)
+    try:
+        base64_encoded_data = base64.b64encode(json_data.encode()).decode()
+    except TypeError as err:
+        raise RandomLetPublisherBaseException(
+            f'Can not encode data to share from {twin_id}/{feed_name}: {err}, {json_data}'
+        ) from err
+
+    api = self.qapi_factory.get_feed_api()
+    api.share_feed_data(
+        twin_id, feed_name,
+        data=base64_encoded_data, mime='application/json'
+    )
+
+    return non_encoded_data
+```
+
+In `conf.py`:
+
+### Adds a configurable publishing frequency
+```python
+update_frequency_seconds: int = 10
+```
+
+> The configuration used in this template is built using pydantic (see https://pydantic-docs.helpmanual.io/)
+
+As an example of how this configuration works, you can change this `update_frequency_seconds` value from its default of 10, by setting the environment variable `{{cookiecutter.conf_env_var_prefix}}UPDATE_FREQUENCY_SECONDS`
+e.g. to set it to 1 second: `export {{cookiecutter.conf_env_var_prefix}}UPDATE_FREQUENCY_SECONDS=1`
+{% else %}
+TODO: summary
+{% endif %}
+
+## Tests and checks
+
+> Note to run the following commands, you need to setup your own Python virtual environment:
+```bash
+python3 -mvenv env
+source ./env/bin/activate
+pip install -U pip setuptools
+```
+
+`make unit-static-tests` # Run unit and static tests using tox
+
+`make static-tests` # Run static tests only, using tox
+
+`make unit-tests` # Run unit tests only, using tox
+
+
+## Running locally
+
+**Create yourself a user key and some credentials for this component**
+
+```bash
+# Create user seed, if you haven't already created a user seed e.g. in the follower, in which case just use that seed
+docker run --env RESOLVER="[address of resolver]" quay.io/iotic_labs/ioticsctl create seed
+#> [user seed e.g. abcdef1234...]
+docker run --env RESOLVER="[address of resolver]" quay.io/iotic_labs/ioticsctl create did --seed [user seed e.g. abcdef1234] --purpose user --number 0
+#> DID Created: [user id e.g. did:iotics:xyz54321...]
+docker run --env RESOLVER="[address of resolver]" quay.io/iotic_labs/ioticsctl wizard create --type agent --name publisher-agent --seed [user seed e.g. abcdef1234] --purpose user --number 0
+#> Created agent with ID [e.g. did:iotics:aaa111...] and delegated by user ID [e.g. did:iotics:xyz54321...]
+#> SEED: [agent seed e.g. lmnop5678...]
+```
+
+
+**Run locally**
+
+```bash
+cd ./{{cookiecutter.publisher_dir}}
+# then export some environment variables
+export SEED=[agent seed from above e.g. lmnop5678...]
+export HOST_USER=[user did e.g. did:iotics:xyz54321...]
+export QAPI_URL=[address of qapi]
+export RESOLVER_HOST=[address of resolver for your space]
+
+# next either
+make docker-run-host # Run using the docker image
+# OR
+python3 -mvenv env
+source ./env/bin/activate
+pip install -U pip setuptools
+
+make setup-dev
+
+make run # Run using the sources from your computer
+```

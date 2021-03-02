@@ -1,0 +1,19 @@
+FROM python:3.8
+ARG PIP_INDEX_URL
+ARG PKG_NAME
+ARG DEPENDENCIES
+RUN test -n "$PIP_INDEX_URL" || (echo "--build-arg PIP_INDEX_URL not set" && false)
+RUN test -n "PKG_NAME" || (echo "--build-arg PKG_NAME not set" && false)
+
+
+RUN curl -k -s -o /corp.iotic.ca.pem https://ca.cor.corp.iotic/ca.pem
+
+COPY ./dist /dist
+COPY ./checker.sh /
+RUN chmod +x ./checker.sh
+
+RUN echo "pip3 install  -i $PIP_INDEX_URL --cert /corp.iotic.ca.pem -f ./dist ./dist/${PKG_NAME}${DEPENDENCIES}"
+RUN pip3 install  -i $PIP_INDEX_URL --cert /corp.iotic.ca.pem -f ./dist ./dist/${PKG_NAME}${DEPENDENCIES}
+
+ENV START_CMD="/checker.sh $DEPENDENCIES"
+ENTRYPOINT $START_CMD

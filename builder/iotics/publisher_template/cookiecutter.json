@@ -1,0 +1,10 @@
+{
+    "_comment": "Do not update this file without updating the hack in the hooks!",
+    "project_name": "A project name used in the doc (ex: Random Letter Generator)",
+    "publisher_dir": "publisher directory name (ex: random-let-pub)",
+    "module_name": "python module name (ex: randpub)",
+    "command_name": "command line name (ex: run-rand-pub)",
+    "conf_env_var_prefix": "conf environment variable prefix (ex: RANDPUB_)",
+    "publisher_class_name": "publisher class name (ex: RandomLetPublisher)",
+    "add_example_code": ["YES", "NO"]
+}

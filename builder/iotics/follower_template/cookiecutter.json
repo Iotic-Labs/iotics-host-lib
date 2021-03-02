@@ -1,0 +1,10 @@
+{
+    "_comment": "Do not update this file without updating the hack in the hooks!",
+    "project_name": "A project name used in the doc (ex: Random Letter Generator)",
+    "follower_dir": "follower directory name (ex: random-let-fol)",
+    "module_name": "python module name (ex: randfol)",
+    "command_name": "command line name (ex: run-rand-fol)",
+    "conf_env_var_prefix": "conf environment variable prefix (ex: RANDFOL_)",
+    "follower_class_name": "follower class name (ex: RandomLetFollower)",
+    "add_example_code": ["YES", "NO"]
+}
