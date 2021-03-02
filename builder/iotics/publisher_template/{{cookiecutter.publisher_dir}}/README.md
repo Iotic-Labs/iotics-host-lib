@@ -32,6 +32,35 @@ def _set_twin_meta(self, twin_id: str):
         add_comments=[LangLiteral(value=description, lang='en')]
     )
 ```
+#### Adding semantic meta data via property usage
+
+In the code snippet below, a property is added to the twin while setting the meta data.
+This will allow to run a semantic search based on a set of properties. You can see the follower
+doing this type of search in its `Semantic searches for and follows twins` section.
+Read more about properties in the Iotics documentation:
+- [What is an IOTICS Digital Twin?](https://docs.iotics.com/docs/key-concepts#what-is-an-iotics-digital-twin)
+- [Properties](https://docs.iotics.com/docs/setting-up-a-digital-twin#properties)
+
+```python
+def _set_twin_meta(self, twin_id: str):
+    label = 'Random awesome twin'
+    description = 'Awesome twin for random data'
+    api = self.qapi_factory.get_twin_api()
+
+    # Adding Semantic Meta data via property usage.
+    # Here we are setting a "Category" property to this twin.
+    # The twin is identified as a "Temperature" twin.
+    category_property = ModelProperty(key='http://data.iotics.com/ns/category',
+                                      uri_value=Uri(value='http://data.iotics.com/category/Temperature'))
+
+    api.update_twin(
+        twin_id,
+        add_tags=['random', 'awesome'],
+        add_labels=[LangLiteral(value=label, lang='en')],
+        add_comments=[LangLiteral(value=description, lang='en')],
+        add_props=[category_property]
+    )
+```
 
 ### Creates a feed and sets its meta data
 ```python
