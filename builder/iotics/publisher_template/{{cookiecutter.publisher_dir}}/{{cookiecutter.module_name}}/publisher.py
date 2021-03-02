@@ -21,7 +21,7 @@ import time
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from iotic.web.rest.client.qapi import LangLiteral
+from iotic.web.rest.client.qapi import LangLiteral, ModelProperty, Uri
 from iotic.web.rest.client.qapi.models.value import Value
 from iotics.host.api.data_types import BasicDataTypes
 {% else %}
@@ -72,11 +72,17 @@ class {{cookiecutter.publisher_class_name}}:
         label = 'Random awesome twin'
         description = 'Awesome twin for random data'
         api = self.qapi_factory.get_twin_api()
+        # Adding Semantic Meta data via property usage.
+        # Here we are setting a "Category" property to this twin
+        # The twin is identified as a "Temperature" twin
+        category_property = ModelProperty(key='http://data.iotics.com/ns/category',
+                                          uri_value=Uri(value='http://data.iotics.com/category/Temperature'))
         api.update_twin(
             twin_id,
             add_tags=['random', 'awesome'],
             add_labels=[LangLiteral(value=label, lang='en')],
-            add_comments=[LangLiteral(value=description, lang='en')]
+            add_comments=[LangLiteral(value=description, lang='en')],
+            add_props=[category_property]
         )
         logging.info('Created Twin %s', api.describe_twin(twin_id=twin_id))
 
@@ -129,7 +135,7 @@ class {{cookiecutter.publisher_class_name}}:
         return non_encoded_data
 
     def setup(self):
-        """Create an twin and set its metadata. Create a feed an set its metadata."""
+        """Create an twin and set its meta data. Create a feed an set its meta data."""
 
         logger.info('Publisher setup')
         twin_id = self._create_twin()
