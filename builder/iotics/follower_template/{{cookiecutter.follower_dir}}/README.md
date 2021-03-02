@@ -18,7 +18,7 @@ In `follower.py` the example:
         self.follower_twin_id = twin_id
 ```
 
-### Searches for and follows twins
+### Text based searches for and follows twins
 This search will return twins with matching text in their or their feeds' labels, descriptions or tags. You can see the publisher adding such a tag to the twins it creates in its `_set_twin_meta` method.
 ```python
 def follow_twins(self):
@@ -29,6 +29,43 @@ def follow_twins(self):
     try:
         # find twins
         twin_list = self.search_api.search_twins(text='Random')
+
+
+...
+
+    for twin in twin_list:
+        subscription_id = None
+
+        try:
+            # follow twin's feed
+            subscription_id = self.follow_api.subscribe_to_feed(
+                self.follower_twin_id, twin.id.value, 'random_temperature_feed', self.follow_callback
+            )
+```
+
+
+### Semantic based searches for and follows twins
+This search will return the twins identified with the *Temperature Category* (ie it will return the twins
+including this Category in their meta data properties).
+You can see how to add semantic meta data in the `Adding semantic meta data via property usage` section
+in the README of the publisher.
+
+It is possible to search for the twins identified with a set of properties (a "and" is performed).
+Read more about search in the Iotics documentation: [How to search](https://docs.iotics.com/docs/how-to-search).
+```python
+from iotic.web.rest.client.qapi import ModelProperty, Uri
+[...]
+def follow_twins(self):
+    """Find and follow twins"""
+
+    twin_list = list()
+
+    try:
+        # Searching Semantically - run a search for all the twins identified with the Temperature category
+        temperature_property = ModelProperty(key='http://data.iotics.com/ns/category',
+                                             uri_value=Uri(value='http://data.iotics.com/category/Temperature'))
+        twin_list = self.search_api.search_twins(properties=[temperature_property])
+
 
 ...
 
@@ -70,7 +107,7 @@ def run(self):
 ```python
 def get_most_recent_data(self, followed_twin_id: str, feed_id: str):
     """ Get feed's most recent data via the InterestApi
-        Note: the feed metadata must include store_last=True
+        Note: the feed meta data must include store_last=True
     """
     logger.info('Get most recent data via InterestApi')
     most_recent_data = self.interest_api.get_feed_last_stored(follower_twin_id=self.follower_twin_id,
