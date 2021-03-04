@@ -33,7 +33,7 @@ def test_auth_builder_should_raise_if_invalid_user_id(valid_auth_params):
 def test_auth_builder_should_raise_if_resolver_not_found(valid_auth_params):
     with pytest.raises(DataSourcesAuthException) as exc_wrapper:
         AgentAuthBuilder.build_agent_auth(**valid_auth_params)
-    assert 'Failed to establish a new connection' in str(exc_wrapper.value)
+    assert 'Failed to retrieve token from' in str(exc_wrapper.value)
 
 
 def test_auth_builder_should_raise_if_no_agent_doc(requests_mock, valid_auth_params):
