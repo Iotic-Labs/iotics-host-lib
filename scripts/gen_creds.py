@@ -15,105 +15,109 @@ except ModuleNotFoundError as err:
         raise
 
     print('Missing Iotics dependency, try `pip install -f deps iotic.lib.identity`.', file=sys.stderr)
-    exit(1)
-
-NEW_SEED_LEN = 256  # 128 or 256
-RESOLVER = os.getenv('RESOLVER') or 'http://localhost:5000'
-SEED_CACHE_FILE = Path('user_seed.txt')
+    sys.exit(1)
 
 
 def main():
-    check_resolver()
-    if not SEED_CACHE_FILE.is_file():
-        answer = input('Creating a new user seed, continue? [y]: ')
-        if answer != 'y':
-            return
-
-    user_seed, created = get_or_create_user_seed()
+    cred_gen = CredentialsGenerator()
+    user_seed, created = cred_gen.get_or_create_user_seed()
     if created:
-        store_seed(user_seed)
-    else:
-        print(f'Using an existing user seed from `{SEED_CACHE_FILE.absolute()}`.')
+        cred_gen.store_seed(user_seed)
 
-    user_doc, _ = get_or_create_user_identity(user_seed)
-    answer = input('Creating a new agent seed, continue? [y]: ')
-    if answer != 'y':
-        return
+    user_doc = cred_gen.get_or_create_user_identity(user_seed)
+    agent_seed = cred_gen.create_agent(user_doc)
 
-    agent_seed = create_agent(user_doc)
     print('A new agent has been created, use the following variables for your connector:\n')
-    print(f'export RESOLVER_HOST={RESOLVER}')
+    print(f'export RESOLVER_HOST={cred_gen.resolver_address}')
     print(f'export HOST_USER={user_doc.id}')
     print(f'export SEED={agent_seed}')
     print('\nRemember to store the above values as you may loose control of your connectors otherwise.')
 
 
-def check_resolver():
-    if os.getenv('RESOLVER'):
-        print(f'A simple helper script to generate DIDs and seeds using `{RESOLVER}` resolver.')
-    else:
-        print(f'`RESOLVER` environment variable not found, defaulting to `{RESOLVER}`.')
-        os.environ['RESOLVER'] = RESOLVER
+class CredentialsGenerator:
+    new_seed_len = 256  # 128 or 256
+    seed_cache_file = 'user_seed.txt'
 
+    def __init__(self):
+        self.resolver_address = os.getenv('RESOLVER') or 'http://localhost:5000'
+        if os.getenv('RESOLVER'):
+            print(f'A simple helper script to generate DIDs and seeds using `{self.resolver_address}` resolver.')
+        else:
+            print(f'`RESOLVER` environment variable not found, defaulting to `{self.resolver_address}`.')
+            os.environ['RESOLVER'] = self.resolver_address
 
-def get_or_create_user_seed():
-    """Creates a random or finds an existing seed for a project (used to create user/agent DIDs)."""
-    created = False
-    if SEED_CACHE_FILE.is_file():
-        with SEED_CACHE_FILE.open() as f:
-            seed = f.readline()
-    else:
-        seed = Identifier.new_seed(NEW_SEED_LEN)
-        created = True
-    return seed, created
+        self.identity_client = IdentityClient()
+        self.seed_cache = Path(self.seed_cache_file)
 
+    def get_or_create_user_seed(self):
+        """Creates a random or finds an existing user seed (used to create user/agent DIDs)."""
+        if not self.seed_cache.is_file():
+            self.continue_prompt('Creating a new user seed')
 
-def store_seed(seed):
-    """Stores project seed for a later use, to create more agents for the same user."""
-    print(f'A new user has been created for seed: `{seed}`.')
-    print('Remember that the seed is your secret value, you should keep it safe and secure!')
-    answer = input(f'Do you want to store the seed in `{SEED_CACHE_FILE.absolute()}` for later use? [y]: ')
-    if answer == 'y':
-        SEED_CACHE_FILE.write_text(seed)
-        print('It is NOT advised to store a seed in a file on a production environment.')
-
-
-def get_or_create_user_identity(user_seed):
-    """Creates a new or finds an existing user identity (DID)."""
-    user_doc, created, _ = _get_doc(Identifier.DIDType.USER, user_seed)
-    return user_doc, created
-
-
-def create_agent(user_doc):
-    """Returns a seed and creates an agent (DID) if agent with given name does not exist."""
-    agent_seed = Identifier.new_seed(NEW_SEED_LEN)
-    agent_doc, _, private_key = _get_doc(Identifier.DIDType.AGENT, agent_seed)
-
-    proof = Document.new_proof(user_doc.id.encode('ascii'), private_key)
-    delegation = Document.new_delegation('#agent', agent_doc.id + agent_doc.public_keys[0].id, proof)
-    user_doc.add_authentication_delegation(delegation)
-
-    return agent_seed
-
-
-def _get_doc(did_type, seed_str):
-    """Creates a new or finds an existing user/agent identity."""
-    seed = Identifier.seed_to_master(seed_str)
-    private_key_hex = Identifier.new_private_hex_from_path(seed, did_type, count=0)
-    private_key_ecdsa = Identifier.private_hex_to_ECDSA(private_key_hex)
-    doc = Document.new_did_document(did_type, private_key_ecdsa)
-    did = doc.id
-    identity_client = IdentityClient()
-    try:
-        doc = identity_client.discover(did)
-    except IdentityNotFound:
-        token = Document.new_document_token(doc, RESOLVER, did + doc.public_keys[0].id, private_key_ecdsa)
-        identity_client.register(token)
-        created = True
-    else:
         created = False
+        if self.seed_cache.is_file():
+            with self.seed_cache.open() as f:
+                seed = f.readline()
+            # Validate seed
+            print(f'Found a user seed in `{self.seed_cache.absolute()}`.')
+        else:
+            seed = Identifier.new_seed(self.new_seed_len)
+            created = True
+        return seed, created
 
-    return doc, created, private_key_ecdsa
+    def store_seed(self, seed):
+        """Stores given user seed for a later use, i.e. to create more agents for the same user."""
+        print(f'A new user seed has been generated: `{seed}`.')
+        print('Remember that this seed is your secret value, you should keep it safe and secure!')
+        answer = input(f'Do you want to store the seed in `{self.seed_cache.absolute()}` for later use? [y]: ')
+        if answer == 'y':
+            self.seed_cache.write_text(seed)
+            print('It is NOT recommended to store a seed in a file on a production environment!')
+
+    def get_or_create_user_identity(self, user_seed):
+        """Creates a new or finds an existing user identity (DID)."""
+        user_doc, created, _ = self._get_doc(Identifier.DIDType.USER, user_seed)
+        if created:
+            print('A new user DID has been created.')
+        return user_doc
+
+    def create_agent(self, user_doc):
+        """Creates an agent (DID) for given user and returns its secret seed."""
+        self.continue_prompt('Creating a new agent')
+
+        agent_seed = Identifier.new_seed(self.new_seed_len)
+        agent_doc, _, private_key = self._get_doc(Identifier.DIDType.AGENT, agent_seed)
+
+        proof = Document.new_proof(user_doc.id.encode('ascii'), private_key)
+        delegation = Document.new_delegation('#agent', agent_doc.id + agent_doc.public_keys[0].id, proof)
+        user_doc.add_authentication_delegation(delegation)
+
+        return agent_seed
+
+    @staticmethod
+    def continue_prompt(text):
+        answer = input(f'{text}, continue? [y]: ')
+        if answer != 'y':
+            sys.exit()
+
+    def _get_doc(self, did_type, seed_str):
+        """Creates a new or finds an existing user/agent identity."""
+        seed = Identifier.seed_to_master(seed_str)
+        private_key_hex = Identifier.new_private_hex_from_path(seed, did_type, count=0)
+        private_key_ecdsa = Identifier.private_hex_to_ECDSA(private_key_hex)
+        doc = Document.new_did_document(did_type, private_key_ecdsa)
+        did = doc.id
+        try:
+            doc = self.identity_client.discover(did)
+        except IdentityNotFound:
+            token = Document.new_document_token(
+                doc, self.resolver_address, did + doc.public_keys[0].id, private_key_ecdsa)
+            self.identity_client.register(token)
+            created = True
+        else:
+            created = False
+
+        return doc, created, private_key_ecdsa
 
 
 if __name__ == '__main__':
