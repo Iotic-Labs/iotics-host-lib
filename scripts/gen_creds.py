@@ -7,7 +7,8 @@ if sys.version_info < (3, 8):
     print('Unexpected Python version, recommended version: 3.8', file=sys.stderr)
 
 try:
-    from iotic.lib.identity import Document, Identifier, Resolver
+    from iotic.lib.identity import Document, Identifier
+    from iotic.lib.identity.client import IdentityClient
     from iotic.lib.identity.exceptions import IdentityNotFound
 except ModuleNotFoundError as err:
     if err.name not in ['iotic', 'iotic.lib', 'iotic.lib.identity']:
@@ -102,11 +103,12 @@ def _get_doc(did_type, seed_str):
     private_key_ecdsa = Identifier.private_hex_to_ECDSA(private_key_hex)
     doc = Document.new_did_document(did_type, private_key_ecdsa)
     did = doc.id
+    identity_client = IdentityClient()
     try:
-        doc = Resolver.discover(did)
+        doc = identity_client.discover(did)
     except IdentityNotFound:
         token = Document.new_document_token(doc, RESOLVER, did + doc.public_keys[0].id, private_key_ecdsa)
-        Resolver.register(token)
+        identity_client.register(token)
         created = True
     else:
         created = False
