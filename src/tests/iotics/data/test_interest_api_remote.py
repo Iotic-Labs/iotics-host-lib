@@ -15,15 +15,16 @@ def test_should_get_a_interest_api():
 def test_should_raise_qapi_error_if_connection_error():
     api = QApiFactory(ConfTest(), AgentAuthTest()).get_interest_api()
     with pytest.raises(DataSourcesQApiError) as error:
-        api.get_feed_last_stored('follower_twin_id', 'followed_twin_id', 'feed_id')
+        api.get_feed_last_stored('host_id', 'follower_twin_id', 'followed_twin_id', 'feed_id')
     assert 'Max retries exceeded with' in str(error.value)
 
 
 @pytest.mark.parametrize(
     'arguments,missing_param', [
-        (['follower_twin_id', None, 'feed_id'], 'followed_twin_id'),
-        ([None, 'followed_twin_id', 'feed_id'], 'follower_twin_id'),
-        (['follower_twin_id', 'followed_twin_id', None], 'followed_feed_id'),
+        ([None, 'follower_twin_id', 'followed_twin_id', 'feed_id'], 'host_id'),
+        (['host_id', 'follower_twin_id', None, 'feed_id'], 'followed_twin_id'),
+        (['host_id', None, 'followed_twin_id', 'feed_id'], 'follower_twin_id'),
+        (['host_id', 'follower_twin_id', 'followed_twin_id', None], 'followed_feed_id'),
     ])
 def test_should_raise_qapi_error_if_missing_param(arguments, missing_param):
     api = QApiFactory(ConfTest(), AgentAuthTest()).get_interest_api()
@@ -35,7 +36,7 @@ def test_should_raise_qapi_error_if_missing_param(arguments, missing_param):
 def test_should_raise_qapi_http_error_if_http_error(api_exception):
     api = InterestApi(InterestClient(api_client=FakeApiClient(error=api_exception)), client_app_id='app1')
     with pytest.raises(DataSourcesQApiHttpError) as error:
-        api.get_feed_last_stored('follower_twin_id', 'did:iotics:e1', 'feed_id')
+        api.get_feed_last_stored('host_id', 'follower_twin_id', 'did:iotics:e1', 'feed_id')
     assert '' in str(error.value)
 
 
@@ -47,6 +48,7 @@ def get_test_interest_api():
 
 def get_last_stored_call():
     return get_test_interest_api().get_feed_last_stored(
+        host_id='host_id',
         follower_twin_id='a follower twin id',
         followed_twin_id='a followed twin id',
         feed_id='a feed id'
