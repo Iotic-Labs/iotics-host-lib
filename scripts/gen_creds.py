@@ -25,7 +25,7 @@ def main():
         cred_gen.store_seed(user_seed)
 
     user_doc = cred_gen.get_or_create_user_identity(user_seed)
-    agent_seed = cred_gen.create_agent(user_doc)
+    agent_seed = cred_gen.create_agent(user_doc, user_seed)
 
     print('A new agent has been created, use the following variables for your connector:\n')
     print(f'export RESOLVER_HOST={cred_gen.resolver_address}')
@@ -81,16 +81,21 @@ class CredentialsGenerator:
             print('A new user DID has been created.')
         return user_doc
 
-    def create_agent(self, user_doc):
+    def create_agent(self, user_doc, user_seed):
         """Creates an agent (DID) for given user and returns its secret seed."""
         self.continue_prompt('Creating a new agent')
 
         agent_seed = Identifier.new_seed(self.new_seed_len)
         agent_doc, _, private_key = self._get_doc(Identifier.DIDType.AGENT, agent_seed)
 
+        # Authorising a new agent requires a delegation be added to the user_doc
         proof = Document.new_proof(user_doc.id.encode('ascii'), private_key)
         delegation = Document.new_delegation('#agent', agent_doc.id + agent_doc.public_keys[0].id, proof)
         user_doc.add_authentication_delegation(delegation)
+
+        # Updates to DID documents must be registered on the resolver
+        user_private_ecdsa = self._seed_to_private_key(user_seed, Identifier.DIDType.USER)
+        self._register_doc(user_doc, user_private_ecdsa, overwrite=True)
 
         return agent_seed
 
@@ -100,23 +105,39 @@ class CredentialsGenerator:
         if answer != 'y':
             sys.exit()
 
-    def _get_doc(self, did_type, seed_str):
-        """Creates a new or finds an existing user/agent identity."""
-        seed = Identifier.seed_to_master(seed_str)
-        private_key_hex = Identifier.new_private_hex_from_path(seed, did_type, count=0)
+    def _seed_to_private_key(self, seed, did_type, count=0):
+        """Create a private key ECDSA instance given a seex (hex) and DID Type"""
+        master = Identifier.seed_to_master(seed)
+        private_key_hex = Identifier.new_private_hex_from_path(master, did_type, count=0)
         private_key_ecdsa = Identifier.private_hex_to_ECDSA(private_key_hex)
-        doc = Document.new_did_document(did_type, private_key_ecdsa)
-        did = doc.id
-        try:
-            doc = self.identity_client.discover(did)
-        except IdentityNotFound:
-            token = Document.new_document_token(
-                doc, self.resolver_address, did + doc.public_keys[0].id, private_key_ecdsa)
-            self.identity_client.register(token)
-            created = True
-        else:
-            created = False
+        return private_key_ecdsa
 
+    def _get_doc(self, did_type, seed):
+        """Creates a new or finds an existing user/agent identity."""
+        private_key_ecdsa = self._seed_to_private_key(seed, did_type)
+        doc = Document.new_did_document(did_type, private_key_ecdsa)
+        return self._register_doc(doc, private_key_ecdsa)
+
+    def _register_doc(self, doc, private_key_ecdsa, overwrite=False):
+        """Create or Update a document in the resolver
+        returns doc_instance, created_bool, private_key_ecdsa"""
+        issuer = doc.id + doc.public_keys[0].id
+
+        found = True
+        try:
+            found_doc = self.identity_client.discover(issuer)
+        except IdentityNotFound:
+            found = False
+
+        if found and not overwrite:
+            return found_doc, False, private_key_ecdsa
+
+        token = Document.new_document_token(doc,
+                                            self.resolver_address,
+                                            issuer,
+                                            private_key_ecdsa)
+        self.identity_client.register(token)
+        created = True if not found else False
         return doc, created, private_key_ecdsa
 
 
