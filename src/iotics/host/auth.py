@@ -3,10 +3,9 @@ import re
 from collections import namedtuple
 from typing import Optional
 
-import requests
 from iotic.lib.identity import Authentication, Document, Identifier, Resolver
 from iotic.lib.identity.document import DIDDocument, RESOLVER_ENV
-from iotic.lib.identity.exceptions import IdentityNotFound
+from iotic.lib.identity.exceptions import IdentityNotFound, ResolverError
 
 from iotics.host.exceptions import DataSourcesAuthException
 
@@ -79,7 +78,7 @@ def discover_identity(did) -> Optional[DIDDocument]:
         return Resolver.discover(did)
     except IdentityNotFound:
         return None
-    except requests.RequestException as err:
+    except ResolverError as err:
         raise DataSourcesAuthException(err) from err
 
 
