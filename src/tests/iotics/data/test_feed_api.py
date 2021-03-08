@@ -48,6 +48,7 @@ def get_test_feed_api():
                                          get_test_feed_api().list_feeds,
                                          partial(get_test_feed_api().delete_feed, feed_id='a feed id'),
                                          partial(get_test_feed_api().describe_feed, feed_id='a feed id'),
+                                         partial(get_test_feed_api().describe_remote_feed, feed_id='a feed id', remote_host_id='a remote host id'),  # noqa: E501 pylint: disable=C0301
                                          partial(get_test_feed_api().update_feed, feed_id='a feed id'),
                                          partial(get_test_feed_api().share_feed_data, feed_id='a feed id'),
                                          ))
@@ -68,6 +69,13 @@ def get_delete_feed_call():
 
 def get_describe_feed_call():
     return partial(get_test_feed_api().describe_feed, twin_id='a twin id', feed_id='a feed id')
+
+
+def get_describe_remote_feed_call():
+    return partial(
+        get_test_feed_api().describe_remote_feed, twin_id='a twin id',
+        feed_id='a feed id', remote_host_id='a remote id'
+    )
 
 
 def get_list_feeds_call():
@@ -100,6 +108,7 @@ def get_share_data_call():
                                          get_list_feeds_call(),
                                          get_delete_feed_call(),
                                          get_describe_feed_call(),
+                                         get_describe_remote_feed_call(),
                                          get_update_feed_call(),
                                          get_share_data_call(),
                                          ))
