@@ -9,7 +9,7 @@ from threading import Lock
 
 import shortuuid
 from iotic.web.rest.client.qapi import GeoCircle, GeoLocation, ModelProperty, PayloadFilter, ResponseType, Scope, \
-    SearchRequestPayload, SearchResponsePayload, SearchResponseTwinDetails
+    SearchRequestPayload, SearchResponsePayload
 from iotic.web.stomp.client import StompWSConnection12
 from retry import retry
 from stomp import ConnectionListener
@@ -60,8 +60,8 @@ class SearchStompListener(ConnectionListener):
         else:
             results = self.results[tx_ref]
             results.responses += 1
-            for entity in response.twins:
-                results.put(entity)
+            results.put(response)
+
             if len(response.twins) >= PAGE_LENGTH:
                 with self.page_lock:
                     search_function, last_page = self.searches[tx_ref]
@@ -160,8 +160,8 @@ class SearchAPI:
     def search_twins(
             self, timeout: int = 10, response_type: ResponseType = ResponseType.FULL, radius_km: float = None,
             lat: float = None, long: float = None, properties: ListOrTuple[ModelProperty] = None, text: str = None,
-            scope: str = Scope.GLOBAL
-    ) -> Generator[SearchResponseTwinDetails, None, None]:
+            scope: str = Scope.LOCAL
+    ) -> Generator[SearchResponsePayload, None, None]:
         """Search for twins matching the given criteria. Note that argument descriptions reference possibility of
         providing a language parameter to the qapi, which is not currently offered by this method.
 
@@ -190,22 +190,27 @@ class SearchAPI:
             scope (Scope, optional): Either LOCAL (default) to only return twins from the local host, or GLOBAL to
                 return twins from anywhere on the network.
 
-        Returns: Generator[SearchResponseTwinDetails, None, None]. Each item has this structure:
-            feeds (list[SearchResponseFeedDetails]) - included in ResponseType.FULL, the feeds present on the twin:
-                feed (Feed):
-                    id (FeedID): has sole attribute `value`, containing the feed's ID as a string
-                    twin_id (TwinID): has sole attribute `value`, containing the twin's ID as a string (redundant?)
-                label (str): The feed human readable label in the language specified in the request (if set)
-                store_last (bool): Whether you can access the last data shared to this feed via the InterestApi
-            id (TwinID): has sole attribute `value`, containing the twin's ID as a string (redundant?)
-            label (str): Twin human readable label in the language specified in the request (if set). Included with
-                response_type FULL and LOCATED
-            location (GeoLocation) - The coordinates of the non-digital twin:
-                lat (float): latitude
-                lon (float): longitude
-            properties (list[ModelProperty]) - The custom semantic properties added to the twin. See args for structure.
-                Included with response type FULL
-            tags (list[str]): Any tags added to the twin. Included with response type FULL
+        Returns: Generator[SearchResponsePayload, None, None]. Each item has this structure:
+            remote_host_id (HostID): the id of the remote host the search response is from or None if from local host
+            response_type (ResponseType): response type selected on search
+            status (RpcStatus): code, message and details
+            twins (list[SearchResponseTwinDetails]): list of matching twins each item has this structure
+                feeds (list[SearchResponseFeedDetails]) - included in ResponseType.FULL, the feeds present on the twin:
+                    feed (Feed):
+                        id (FeedID): has sole attribute `value`, containing the feed's ID as a string
+                        twin_id (TwinID): has sole attribute `value`, containing the twin's ID as a string (redundant?)
+                    label (str): The feed human readable label in the language specified in the request (if set)
+                    store_last (bool): Whether you can access the last data shared to this feed via the InterestApi
+                id (TwinID): has sole attribute `value`, containing the twin's ID as a string (redundant?)
+                label (str): Twin human readable label in the language specified in the request (if set). Included with
+                    response_type FULL and LOCATED
+                location (GeoLocation) - The coordinates of the non-digital twin:
+                    lat (float): latitude
+                    lon (float): longitude
+                properties (list[ModelProperty]) - The custom semantic properties added to the twin.
+                    See args for structure.
+                    Included with response type FULL
+                tags (list[str]): Any tags added to the twin. Included with response type FULL
 
         """
         if not any(val is not None for val in [radius_km, lat, long]):

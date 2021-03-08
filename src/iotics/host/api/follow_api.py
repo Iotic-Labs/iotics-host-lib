@@ -169,7 +169,8 @@ class FollowAPI:
             return
 
     def subscribe_to_feed(self, follower_twin_id: str, followed_twin_id: str, followed_feed_name: str,
-                          callback: Callable, client_ref: str = None, transaction_ref: str = None) -> Optional[str]:
+                          callback: Callable, client_ref: str = None, transaction_ref: str = None,
+                          remote_host_id: str = None) -> Optional[str]:
         """Subscribe to a twin's feed and provide a callable to be executed on its data when it is shared
 
         Args:
@@ -180,15 +181,21 @@ class FollowAPI:
                 message as arguments
             client_ref (str, optional): to be deprecated, must be unique for each request
             transaction_ref (str, optional): Used to loosely link requests/responses in a distributed env't. Max 36 char
-
+            remote_host_id (str, optional): Set this to follow a feed on a remote host
         Returns:
             int: subscription id, or None if already subscribed
 
         """
 
         # this pattern for the subscribe topic:
-        # "^/qapi/twins/(?<followerTwinId>.+)/interests/twins/(?<followedTwinId>.+)/feeds/(?<followedFeedId>.+)$"  # noqa: E501 pylint: disable=C0301
-        topic = f'/qapi/twins/{follower_twin_id}/interests/twins/{followed_twin_id}/feeds/{followed_feed_name}'
+        if remote_host_id:
+            # '/qapi/twins/{consumer_entity_id}/interests/hosts/{followed_host_id}/twins/{followed_entity_id}/feeds/{followed_point_id}'  # noqa: E501 pylint: disable=C0301
+            topic = f'/qapi/twins/{follower_twin_id}/interests/hosts/{remote_host_id}/twins/{followed_twin_id}/feeds/{followed_feed_name}'  # noqa: E501 pylint: disable=C0301
+            logger.debug('Subscribing to remote feed')
+        else:
+            # "^/qapi/twins/(?<followerTwinId>.+)/interests/twins/(?<followedTwinId>.+)/feeds/(?<followedFeedId>.+)$"  # noqa: E501 pylint: disable=C0301
+            topic = f'/qapi/twins/{follower_twin_id}/interests/twins/{followed_twin_id}/feeds/{followed_feed_name}'
+            logger.debug('Subscribing to local feed')
 
         if topic in self._subscriptions:
             return None
