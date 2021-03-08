@@ -1,4 +1,3 @@
-# Copyright (c) 2020 Iotic Labs Ltd. All rights reserved.
 import glob
 from os.path import abspath, dirname, join
 
