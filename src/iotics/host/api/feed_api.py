@@ -135,6 +135,52 @@ class FeedApi:
 
     @check_and_retry_with_new_token
     @fill_refs
+    def describe_remote_feed(
+            self, twin_id: str, feed_id: str, remote_host_id: str,
+            client_ref: str = None, transaction_ref: str = None
+    ) -> DescribeFeedResponsePayload:
+        """Get metadata describing a remote feed.
+
+        Args:
+            twin_id (str): the ID of the twin providing the feed
+            feed_id (str): a unique identifier for the feed, scoped per-twin
+            remote_host_id (str): the ID of the remote host whose feed you want to describe
+            client_ref (str, optional): to be deprecated, must be unique for each request
+            transaction_ref (str, optional): Used to loosely link requests/responses in a distributed env't. Max 36 char
+
+        Returns: DescribeFeedResponsePayload, with structure as follows:
+            remote_host_id (HostID): has sole attribute `value`, containing a string identifying the host the twin is on
+            feed (Feed):
+                id (FeedID): has sole attribute `value`, containing the feed's ID as a string
+                twin_id (TwinID): has sole attribute `value`, containing the twin's ID as a string
+            result (MetaResult):
+                comments (list[LangLiteral]): all the comments on the feed, max one per language. LangLiteral structure:
+                    lang (str): 2-character language code
+                    value (str): the text content of the comment
+                labels (list[LangLiteral]): all the labels on the feed, max one per language
+                store_last (bool): Whether this feed's most recent data can be retrieved via the InterestApi
+                tags (list[str]) (TO BE DEPRECATED): Any tags that have been added to the feed
+                    - note: TAGS ARE TO BE DEPRECATED PLEASE DONT USE
+                values (list[Value]): What sort of data to expect in each feed share. Non-binding. Value structure (all
+                        optional strings):
+                    comment: A human-readable description of the value. Language-specific, eg "Engine oil temperature"
+                    data_type: the xsd type in shorthand notation, eg "integer" or "dateTime"
+                    label: the unique identifier of the value. It is language-neutral, eg "temp"
+                    unit: the fully qualified ontology string URI of the unit, eg
+                        http://purl.obolibrary.org/obo/UO_0000027
+
+        """
+        return self.rest_api_client.describe_remote_feed(
+            twin_id=twin_id,
+            feed_id=feed_id,
+            host_id=remote_host_id,
+            iotics_client_app_id=self.client_app_id,
+            iotics_client_ref=client_ref,
+            iotics_transaction_ref=transaction_ref
+        )
+
+    @check_and_retry_with_new_token
+    @fill_refs
     def update_feed(
             self, twin_id: str, feed_id: str,
             add_labels: ListOrTuple[LangLiteral] = None, del_labels: ListOrTuple[str] = None,

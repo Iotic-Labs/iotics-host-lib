@@ -132,6 +132,53 @@ class TwinApi:
 
     @check_and_retry_with_new_token
     @fill_refs
+    def describe_remote_twin(
+            self, twin_id: str, remote_host_id: str, client_ref: str = None, transaction_ref: str = None
+    ) -> DescribeTwinResponsePayload:
+        """Get metadata describing a remote twin.
+
+        Args:
+            twin_id (str): ID of the twin to update.
+            remote_host_id (str): the ID of the remote host whose twin you want to describe
+            client_ref (str, optional): to be deprecated, must be unique for each request
+            transaction_ref (str, optional): Used to loosely link requests/responses in a distributed env't. Max 36 char
+
+        Returns: DescribeTwinResponsePayload, a deeply nested structure with attributes as below:
+            remote_host_id (HostID): has attribute `value` containing a string identifying the host
+            twin (Twin): has id and visibility attributes, as in other payloads
+            result (TwinMetaResult):
+                comments (list[LangLiteral]): all the comments on the twin, max one per language. LangLiteral structure:
+                    lang (str): 2-character language code
+                    value (str): the text content of the comment
+                labels (list[LangLiteral]): all the labels on the twin, max one per language
+                location (GeoLocation) - The coordinates on Earth of the non-digital twin:
+                    lat (float): Latitude
+                    lon (float): Longitude
+                properties (list[ModelProperty]): The semantic properties added to the twin. ModelProperty structure:
+                    key (str): The predicate of the property. Then, one of the following value (object) types:
+                    lang_literal_value (LangLiteral): A string w/ language, see "comments" above for structure
+                    literal_value (Literal) - Describes a non-string typed value:
+                        data_type (str): short-form xsd type, eg 'integer', 'boolean'
+                        value (str): Content of the value as a string
+                    string_literal_value (StringLiteral): Describes a string w/o language. One attribute, `value` (str)
+                    uri_value (Uri): One attribute, `value`, a string representing a URI
+                tags (list[str]): Any tags that have been added to the twin
+                feeds (list[FeedMeta]): Each FeedMeta has attributes below:
+                    labels (list[LangLiteral]): as above in TwinMetaResult, or below in update_twin
+                    store_last (bool): whether you can access the last data shared to this feed via the InterestApi
+                    feed_id (FeedID): The id of the feed, whose string value is stored in a `value` attribute
+
+        """
+        return self.rest_api_client.describe_remote_twin(
+            twin_id=twin_id,
+            host_id=remote_host_id,
+            iotics_client_app_id=self.client_app_id,
+            iotics_client_ref=client_ref,
+            iotics_transaction_ref=transaction_ref
+        )
+
+    @check_and_retry_with_new_token
+    @fill_refs
     def update_twin(  # pylint:disable=too-many-arguments,too-many-locals
             self, twin_id: str, client_ref: str = None, transaction_ref: str = None,
             new_visibility: Visibility = None, location: GeoLocationUpdate = None,
