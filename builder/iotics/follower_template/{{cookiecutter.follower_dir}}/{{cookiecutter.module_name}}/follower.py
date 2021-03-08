@@ -84,9 +84,11 @@ class {{cookiecutter.follower_class_name}}:
             Note: the feed meta data must include store_last=True
         """
         logger.info('Get most recent data via InterestApi')
-        most_recent_data = self.interest_api.get_feed_last_stored(follower_twin_id=self.follower_twin_id,
-                                                                  followed_twin_id=followed_twin_id,
-                                                                  feed_id=feed_id)
+        most_recent_data = self.interest_api.get_feed_last_stored_local(
+            follower_twin_id=self.follower_twin_id,
+            followed_twin_id=followed_twin_id,
+            feed_id=feed_id
+        )
         decoded_data = base64.b64decode(most_recent_data.feed_data.data).decode()
         temperature = json.loads(decoded_data)
         logger.info('Most recent data %s', temperature)
