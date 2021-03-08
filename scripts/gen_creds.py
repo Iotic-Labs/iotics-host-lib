@@ -3,6 +3,9 @@
 import os
 import sys
 from pathlib import Path
+import secrets
+import string
+
 
 if sys.version_info < (3, 8):
     print('Unexpected Python version, recommended version: 3.8', file=sys.stderr)
@@ -101,7 +104,8 @@ class CredentialsGenerator:
         # Authorising a new agent requires a delegation to be added to the user_doc.
         issuer = agent_doc.id + agent_doc.public_keys[0].id
         proof = Document.new_proof(user_doc.id.encode('ascii'), private_key)
-        delegation = Document.new_delegation('#agent', issuer, proof)
+        dname = '#agent_' + ''.join(secrets.choice(string.ascii_letters + string.digits) for x in range(6))
+        delegation = Document.new_delegation(dname, issuer, proof)
         user_doc.add_authentication_delegation(delegation)
 
         # Updates to DID documents must be registered on the resolver.
