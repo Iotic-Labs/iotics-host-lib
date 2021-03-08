@@ -125,7 +125,7 @@ def test_successful_search():
         api = QApiFactory(ConfTest(), AgentAuthTest()).get_search_api()
     # Range and location arguments added for code coverage - actual functionality cannot be tested by unit tests.
     results = api.search_twins(timeout=1, radius_km=10.0, lat=0, long=0)
-    assert next(results).id.value == RESULT_ID
+    assert next(results).twins[0].id.value == RESULT_ID
     with pytest.raises(StopIteration):
         next(results)
 
