@@ -7,7 +7,7 @@ from iotics.host.exceptions import DataSourcesQApiError, DataSourcesQApiHttpErro
 from tests.iotics.data.mocks import AgentAuthTest, ConfTest, FakeApiClient, get_api_exception
 
 
-def test_should_get_a_interest_api():
+def test_should_get_an_interest_api():
     api = QApiFactory(ConfTest(), AgentAuthTest()).get_interest_api()
     assert isinstance(api, InterestApi)
 

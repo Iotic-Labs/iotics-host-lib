@@ -55,8 +55,8 @@ class InterestApi:
         """ Get the latest stored data from a remote digital twin feed
 
         Args:
+            host_id (str): The ID of the host
             follower_twin_id (str): The ID of the twin asking for the data
-            remote_host_id (str): The ID of the host
             followed_twin_id (str): The ID of the twin whose feed has the data
             feed_id (str): The ID of the feed from which data is sought
             client_ref (str, optional): to be deprecated, must be unique for each request
