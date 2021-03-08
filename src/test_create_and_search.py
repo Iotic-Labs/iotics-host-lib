@@ -30,10 +30,10 @@ tag = 'tag'
 timeout = int(input('Timeout? (10s) ') or 10)
 print("Preexisting entities on hosts:")
 results_local = search_api.search_twins(text=tag, scope=Scope.LOCAL, timeout=timeout)
-results_total = search_api.search_twins(text=tag, timeout=timeout)
-results_total = len(list(results_total))
-print("Local: %s" % len(list(results_local)))
-print("Total: %s" % results_total)
+results_total = search_api.search_twins(text=tag, scope=Scope.GLOBAL, timeout=timeout)
+
+print("Local: %s" % sum([len(resp.twins) for resp in list(results_local)]))
+print("Total: %s" % sum([len(resp.twins) for resp in list(results_total)]))
 if results_total:
     print("You may wish to kill this script and try with a fresh host.")
 
@@ -64,7 +64,7 @@ for i in range(entites_remote):
 
 # Make sure all entities created in the previous step can be found.
 results_local = search_api.search_twins(text=tag, scope=Scope.LOCAL, timeout=timeout)
-results_total = search_api.search_twins(text=tag, timeout=timeout)
+results_total = search_api.search_twins(text=tag, scope=Scope.GLOBAL, timeout=timeout)
 print("Updated entities on hosts:")
-print("Local (expected %s): %s" % (entites_local, len(list(results_local))))
-print("Total: (expected %s): %s" % (entites_local + entites_remote, len(list(results_total))))
+print("Local (expected %s): %s" % (entites_local, sum([len(resp.twins) for resp in list(results_local)])))
+print("Total: (expected %s): %s" % (entites_local + entites_remote, sum([len(resp.twins) for resp in list(results_total)])))
