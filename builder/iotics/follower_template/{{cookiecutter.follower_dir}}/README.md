@@ -24,23 +24,26 @@ This search will return twins with matching text in their or their feeds' labels
 def follow_twins(self):
     """Find and follow twins"""
 
-    twin_list = list()
+    search_resp_gen = None
 
     try:
-        # find twins
-        twin_list = self.search_api.search_twins(text='Random')
+        # search for twins
+        # note: a generator is returned because responses are yielded
+        # as they come in asynchronously from the network of hosts
+        search_resp_gen = self.search_api.search_twins(text='Random')
 
 
 ...
 
-    for twin in twin_list:
-        subscription_id = None
+    for search_resp in search_resp_gen:
+        for twin in search_resp.twins:
+            subscription_id = None
 
-        try:
-            # follow twin's feed
-            subscription_id = self.follow_api.subscribe_to_feed(
-                self.follower_twin_id, twin.id.value, 'random_temperature_feed', self.follow_callback
-            )
+            try:
+                # follow twin's feed
+                subscription_id = self.follow_api.subscribe_to_feed(
+                    self.follower_twin_id, twin.id.value, 'random_temperature_feed', self.follow_callback
+                )
 ```
 
 
@@ -59,25 +62,25 @@ from iotic.web.rest.client.qapi import ModelProperty, Uri
 def follow_twins(self):
     """Find and follow twins"""
 
-    twin_list = list()
-
+...
     try:
         # Searching Semantically - run a search for all the twins identified with the Temperature category
         temperature_property = ModelProperty(key='http://data.iotics.com/ns/category',
                                              uri_value=Uri(value='http://data.iotics.com/category/Temperature'))
-        twin_list = self.search_api.search_twins(properties=[temperature_property])
+        search_resp_gen = self.search_api.search_twins(properties=[temperature_property])
 
 
 ...
 
-    for twin in twin_list:
-        subscription_id = None
+    for search_resp in search_resp_gen:
+        for twin in twin_list:
+            subscription_id = None
 
-        try:
-            # follow twin's feed
-            subscription_id = self.follow_api.subscribe_to_feed(
-                self.follower_twin_id, twin.id.value, 'random_temperature_feed', self.follow_callback
-            )
+            try:
+                # follow twin's feed
+                subscription_id = self.follow_api.subscribe_to_feed(
+                    self.follower_twin_id, twin.id.value, 'random_temperature_feed', self.follow_callback
+                )
 ```
 
 ### Logs the received data
