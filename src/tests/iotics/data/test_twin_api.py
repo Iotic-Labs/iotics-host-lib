@@ -35,6 +35,7 @@ def get_test_twin_api():
 
 @pytest.mark.parametrize('client_call', (get_test_twin_api().delete_twin,
                                          get_test_twin_api().describe_twin,
+                                         partial(get_test_twin_api().describe_remote_twin, remote_host_id='a remote host id'),  # noqa: E501 pylint: disable=C0301
                                          partial(get_test_twin_api().update_twin, ),
                                          ))
 def test_should_raise_if_client_check_fails(client_call):
@@ -54,6 +55,13 @@ def get_delete_twin_call():
 
 def get_describe_twin_call():
     return partial(get_test_twin_api().describe_twin, twin_id='a twin id')
+
+
+def get_describe_remote_twin_call():
+    return partial(
+        get_test_twin_api().describe_remote_twin, twin_id='a twin id',
+        remote_host_id='a remote host id'
+    )
 
 
 def get_list_twins_call():
@@ -82,6 +90,7 @@ def get_update_twin_call():
                                          get_list_twins_call(),
                                          get_delete_twin_call(),
                                          get_describe_twin_call(),
+                                         get_describe_remote_twin_call(),
                                          get_update_twin_call(),
                                          ))
 def test_client_validation_is_ok_should_raise_connection_error(client_call, twin_id, feed_id):

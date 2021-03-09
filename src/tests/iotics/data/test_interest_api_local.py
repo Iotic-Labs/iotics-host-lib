@@ -15,7 +15,7 @@ def test_should_get_a_interest_api():
 def test_should_raise_qapi_error_if_connection_error():
     api = QApiFactory(ConfTest(), AgentAuthTest()).get_interest_api()
     with pytest.raises(DataSourcesQApiError) as error:
-        api.get_feed_last_stored('follower_twin_id', 'followed_twin_id', 'feed_id')
+        api.get_feed_last_stored_local('follower_twin_id', 'followed_twin_id', 'feed_id')
     assert 'Max retries exceeded with' in str(error.value)
 
 
@@ -28,14 +28,14 @@ def test_should_raise_qapi_error_if_connection_error():
 def test_should_raise_qapi_error_if_missing_param(arguments, missing_param):
     api = QApiFactory(ConfTest(), AgentAuthTest()).get_interest_api()
     with pytest.raises(DataSourcesQApiError) as error:
-        api.get_feed_last_stored(*arguments)
+        api.get_feed_last_stored_local(*arguments)
     assert f'Missing the required parameter `{missing_param}`' in str(error.value)
 
 
 def test_should_raise_qapi_http_error_if_http_error(api_exception):
     api = InterestApi(InterestClient(api_client=FakeApiClient(error=api_exception)), client_app_id='app1')
     with pytest.raises(DataSourcesQApiHttpError) as error:
-        api.get_feed_last_stored('follower_twin_id', 'did:iotics:e1', 'feed_id')
+        api.get_feed_last_stored_local('follower_twin_id', 'did:iotics:e1', 'feed_id')
     assert '' in str(error.value)
 
 
@@ -45,15 +45,15 @@ def get_test_interest_api():
     return api
 
 
-def get_last_stored_call():
-    return get_test_interest_api().get_feed_last_stored(
+def get_last_stored_local_call():
+    return get_test_interest_api().get_feed_last_stored_local(
         follower_twin_id='a follower twin id',
         followed_twin_id='a followed twin id',
         feed_id='a feed id'
     )
 
 
-@pytest.mark.parametrize('client_call', (get_last_stored_call,))
+@pytest.mark.parametrize('client_call', (get_last_stored_local_call,))
 def test_client_validation_is_ok_should_raise_connection_error(client_call, twin_id, feed_id):
     """
     Test the Openapi client side validation. The client side validation occurs before the actual rest call.

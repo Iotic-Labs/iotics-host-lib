@@ -70,19 +70,24 @@ class {{cookiecutter.follower_class_name}}:
             Note: the feed meta data must include store_last=True
         """
         logger.info('Get most recent data via InterestApi')
-        most_recent_data = self.interest_api.get_feed_last_stored(follower_twin_id=self.follower_twin_id,
-                                                                  followed_twin_id=followed_twin_id,
-                                                                  feed_id=feed_id)
+        most_recent_data = self.interest_api.get_feed_last_stored_local(
+            follower_twin_id=self.follower_twin_id,
+            followed_twin_id=followed_twin_id,
+            feed_id=feed_id
+        )
         decoded_data = base64.b64decode(most_recent_data.feed_data.data).decode()
         temperature = json.loads(decoded_data)
         logger.info('Most recent data %s', temperature)
 
     def follow_twins(self):
         """Find and follow twins"""
-        found_twins = None
+        search_resp_gen = None
         logger.info('Searching for twins.')
         try:
-            found_twins = self.search_api.search_twins(text='Random')
+            # search for twins
+            # note: a generator is returned because responses are yielded
+            # as they come in asynchronously from the network of hosts
+            search_resp_gen = self.search_api.search_twins(text='Random')
         except DataSourcesSearchTimeout as timeout_ex:
             logger.warning('Timed out searching for twins: %s', timeout_ex)
         except DataSourcesStompError as ex:
@@ -90,27 +95,28 @@ class {{cookiecutter.follower_class_name}}:
         except DataSourcesStompNotConnected:
             logger.warning('Cant search for twins, stomp not currently connected')
 
-        if not found_twins:
+        if not search_resp_gen:
             logger.info('No twins found')
             return
 
-        for twin in found_twins:
-            subscription_id = None
+        for search_resp in search_resp_gen:
+            for twin in search_resp.twins:
+                subscription_id = None
 
-            try:
-                # follow twin's feed
-                subscription_id = self.follow_api.subscribe_to_feed(
-                    self.follower_twin_id, twin.id.value, 'random_temperature_feed', self.follow_callback
-                )
-            except DataSourcesStompNotConnected:
-                logger.warning('Cant follow twin, stomp not currently connected')
-                break
+                try:
+                    # follow twin's feed
+                    subscription_id = self.follow_api.subscribe_to_feed(
+                        self.follower_twin_id, twin.id.value, 'random_temperature_feed', self.follow_callback
+                    )
+                except DataSourcesStompNotConnected:
+                    logger.warning('Cant follow twin, stomp not currently connected')
+                    break
 
-            if subscription_id:
-                logger.info('Subscribed to feed on twin %s', twin.id.value)
-                # Optional call to get the feed's most recent data via the InterestApi
-                # This call is not needed to perform a follow
-                self.get_most_recent_data(twin.id.value, 'random_temperature_feed')
+                if subscription_id:
+                    logger.info('Subscribed to feed on twin %s', twin.id.value)
+                    # Optional call to get the feed's most recent data via the InterestApi
+                    # This call is not needed to perform a follow
+                    self.get_most_recent_data(twin.id.value, 'random_temperature_feed')
 
     def run(self):
         logger.info('Follower started')
