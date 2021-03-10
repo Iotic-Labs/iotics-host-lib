@@ -12,7 +12,8 @@ if sys.version_info < (3, 8):
 try:
     from iotic.lib.identity import Document, Identifier
     from iotic.lib.identity.client import IdentityClient
-    from iotic.lib.identity.exceptions import IdentityNotFound
+    from iotic.lib.identity.exceptions import IdentityNotFound, CommunicationError
+    from iotic.lib.identity.resolver import RESOLVER_ENV, HttpResolverClient
 except ModuleNotFoundError as err:
     if err.name not in ['iotic', 'iotic.lib', 'iotic.lib.identity']:
         raise
@@ -42,14 +43,18 @@ class CredentialsGenerator:
     seed_cache_file = 'user_seed.txt'
 
     def __init__(self):
-        self.resolver_address = os.getenv('RESOLVER') or 'http://localhost:5000'
-        if os.getenv('RESOLVER'):
-            print(f'A simple helper script to generate DIDs and seeds using `{self.resolver_address}` resolver.')
-        else:
-            print(f'`RESOLVER` environment variable not found, defaulting to `{self.resolver_address}`.')
-            os.environ['RESOLVER'] = self.resolver_address
+        self.resolver_address = os.getenv(RESOLVER_ENV)
+        if not self.resolver_address:
+            self.resolver_address = os.getenv('RESOLVER_HOST')
 
-        self.identity_client = IdentityClient()
+        if not self.resolver_address:
+            self.resolver_address = 'http://localhost:5000'
+            print(f'`RESOLVER_HOST` environment variable not found, defaulting to `{self.resolver_address}`.')
+        else:
+            print(f'A simple helper script to generate DIDs and seeds using `{self.resolver_address}` resolver.')
+
+        resolver = HttpResolverClient(self.resolver_address)
+        self.identity_client = IdentityClient(resolver)
         self.seed_cache = Path(self.seed_cache_file)
 
     def get_or_create_user_seed(self):
@@ -79,7 +84,7 @@ class CredentialsGenerator:
         """Stores given user seed for a later use, i.e. to create more agents for the same user."""
         print(f'A new user seed has been generated: `{seed}`.')
         print('Remember that this USER SEED is your secret value, and it should be kept safe and secure!')
-        answer = input(f'Do you want to store the seed in `{self.seed_cache.absolute()}` for later use? [y]: ')
+        answer = input(f'Do you want to store the seed in `{self.seed_cache.absolute()}` for later use? [y/N]: ')
         if answer == 'y':
             self.seed_cache.write_text(seed)
             print(
@@ -115,7 +120,7 @@ class CredentialsGenerator:
 
     @staticmethod
     def continue_prompt(text):
-        answer = input(f'{text}, continue? [y]: ')
+        answer = input(f'{text}, continue? [y/N]: ')
         if answer != 'y':
             sys.exit()
 
@@ -145,6 +150,9 @@ class CredentialsGenerator:
             found_doc = self.identity_client.discover(issuer)
         except IdentityNotFound:
             found = False
+        except CommunicationError:
+            print(f'FATAL: Connection refused on {self.resolver_address}. Quitting.')
+            sys.exit(1)
         else:
             if not overwrite:
                 return found_doc, False, private_key_ecdsa
