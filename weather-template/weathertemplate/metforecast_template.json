@@ -1,0 +1,145 @@
+{
+	"version": "alpha-0.1",
+	"userdid": "setme",
+	"node": "node01.connect.space.iotics.com",
+	"clientappid": "fn-metoffice-forecast",
+	"clientref": "metforecast",
+	"items": [
+		{
+			"name": "",
+			"number": 0,
+			"latitude": 0,
+			"longitude": 0,
+			"tags": [
+				"metoffice",
+				"weather",
+				"forecast",
+				"cat_weather"
+			],
+			"properties": [
+				{
+					"key": "http://data.iotics.com/ns/category",
+					"value": "http://data.iotics.com/category/Weather"
+				}
+			],
+			"comments": [
+				{
+					"value": "",
+					"lang": "en"
+				}
+			],
+			"labels": [
+				{
+					"value": "",
+					"lang": "en"
+				}
+			],
+			"points": [
+				{
+					"pointtype": "",
+					"storelast": false,
+					"id": "setme",
+					"pointlabel": [
+						{
+							"value": "setme",
+							"lang": "en"
+						}
+					],
+					"pointcomments": [
+						{
+							"value": "setme",
+							"lang": "en"
+						}
+					],
+					"pointmeta": [
+						{
+							"label": "feels",
+							"data_type": "decimal",
+							"comment": "temperature feels like",
+							"unit": "http://purl.obolibrary.org/obo/UO_0000027"
+						},
+						{
+							"label": "gust",
+							"data_type": "decimal",
+							"comment": "wind gust speed in kph",
+							"unit": "http://purl.obolibrary.org/obo/UO_0010008"
+						},
+						{
+							"label": "humid",
+							"data_type": "decimal",
+							"comment": "screen relative humidity",
+							"unit": "http://purl.obolibrary.org/obo/UO_0000187"
+						},
+						{
+							"label": "temp",
+							"data_type": "decimal",
+							"comment": "temperature",
+							"unit": "http://purl.obolibrary.org/obo/UO_0000027"
+						},
+						{
+							"label": "visib",
+							"data_type": "string",
+							"comment": "visibility short code VG = very good, GO = good, MO = moderate",
+							"unit": ""
+						},
+						{
+							"label": "winddir",
+							"data_type": "string",
+							"comment": "wind direction compass points SW = south west",
+							"unit": ""
+						},
+						{
+							"label": "windspd",
+							"data_type": "decimal",
+							"comment": "wind speed in kph",
+							"unit": "http://purl.obolibrary.org/obo/UO_0010008"
+						},
+						{
+							"label": "uv",
+							"data_type": "decimal",
+							"comment": "UV index",
+							"unit": ""
+						},
+						{
+							"label": "type",
+							"data_type": "string",
+							"comment": "metoffice API weather type",
+							"unit": ""
+						},
+						{
+							"label": "prob",
+							"data_type": "decimal",
+							"comment": "precipitation probability",
+							"unit": "http://purl.obolibrary.org/obo/UO_0000187"
+						},
+						{
+							"label": "type_text",
+							"data_type": "string",
+							"comment": "metoffice API weather type description",
+							"unit": ""
+						},
+						{
+							"label": "visib_text",
+							"data_type": "string",
+							"comment": "metoffice API visibility type description",
+							"unit": ""
+						},
+						{
+							"label": "winddir_degree",
+							"data_type": "decimal",
+							"comment": "wind direction in degrees",
+							"unit": "http://purl.obolibrary.org/obo/UO_0000185"
+						}
+					],
+					"pointtags": [
+						"metoffice",
+						"weather",
+						"forecast",
+						"cat_weather"
+					],
+					"pointvalues": []
+				}
+			]
+		}
+	]
+}
