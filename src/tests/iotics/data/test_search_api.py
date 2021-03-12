@@ -1,4 +1,5 @@
 import json
+import logging
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -175,7 +176,7 @@ def test_error_deserialization_error():
 def test_message_deserialization_error():
     listener = SearchStompListener(None)
     tx_ref = 'dummy'
-    listener.on_message(headers={TXREF_HEADER: f'{tx_ref}_page'}, body='')
+    listener.on_message(headers={TXREF_HEADER: f'{tx_ref}_page0'}, body='')
     assert listener.errors[tx_ref] == ['Deserialization error: Response does not have twins list']
 
 
@@ -191,7 +192,27 @@ def test_listener_message_pagination():
     last_page = 0
     listener.searches[tx_ref] = search_function, last_page
 
-    listener.on_message(headers={TXREF_HEADER: f'{tx_ref}_page'}, body=response)
+    listener.on_message(headers={TXREF_HEADER: f'{tx_ref}_page0'}, body=response)
     search_function, current_last_page = listener.searches[tx_ref]
     assert current_last_page == 1
     search_function.assert_called_once_with(page=current_last_page)
+
+
+def test_error_subscription_error():
+    """test TXREF_HEADER not containing a _page which it wont for
+    the subscription shared across all searches
+    """
+    listener = SearchStompListener(None)
+    tx_ref = 'txref-DH2CjRmzDf'
+    listener.on_error(headers={TXREF_HEADER: f'{tx_ref}'}, body='')
+    assert listener.errors[tx_ref] == ['Deserialization error: Expecting value: line 1 column 1 (char 0)']
+
+
+@pytest.mark.parametrize('page', ('', '_page', '_pageNotAnInteger'))
+def test_message_invalid_page_number(caplog, page):
+    listener = SearchStompListener(None)
+    tx_ref = 'dummy'
+
+    with caplog.at_level(logging.ERROR):
+        listener.on_message(headers={TXREF_HEADER: f'{tx_ref}{page}'}, body='')
+        assert 'Received a message without an integer page number' in caplog.text
