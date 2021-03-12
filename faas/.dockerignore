@@ -1,0 +1,10 @@
+venv
+.idea
+.git
+tests
+.pytest_cache
+.tox
+tox.ini
+res/
+htmlcov
+

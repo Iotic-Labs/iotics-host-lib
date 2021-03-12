@@ -6,13 +6,14 @@ from uuid import uuid4
 from queue import Queue
 from collections import namedtuple
 import requests
+from datetime import datetime, timezone
 
 from iotic.web.rest.client.qapi import LangLiteral, Value, GeoLocationUpdate, GeoLocation
 from iotics.host.api.qapi import QApiFactory
 from iotics.host.auth import AgentAuthBuilder, AgentAuth
 from iotics.host.exceptions import (
     DataSourcesConfigurationError, DataSourcesError, DataSourcesSearchTimeout,
-    DataSourcesStompError, DataSourcesStompNotConnected
+    DataSourcesStompError, DataSourcesStompNotConnected, DataSourcesQApiError
 )
 from iotics.host.api.data_types import BasicDataTypes
 
@@ -64,7 +65,7 @@ class CallApi:
 
         self.twin_api.update_twin(
             twin_id,
-            add_tags=['function'],
+            add_tags=['call_api'],
             add_labels=[LangLiteral(value=label, lang='en')],
             add_comments=[LangLiteral(value=description, lang='en')],
             location=london_location,
@@ -118,22 +119,6 @@ class CallApi:
                 template_id=feed_data.get('template_id')
             )
         )
-
-    def get_most_recent_data(self, followed_twin_id: str, feed_id: str):
-        """ Get feed's most recent data via the InterestApi
-            Note: the feed meta data must include store_last=True
-        """
-        logger.debug('Get most recent data via InterestApi')
-        most_recent_data = self.interest_api.get_feed_last_stored_local(
-            follower_twin_id=self.follower_twin_id,
-            followed_twin_id=followed_twin_id,
-            feed_id=feed_id
-        )
-        decoded_data = base64.b64decode(most_recent_data.feed_data.data).decode()
-        feed_data = json.loads(decoded_data)
-        # logger.info('Most recent data for feed %s: %s', feed_id, feed_data)
-
-        return feed_data
 
     @staticmethod
     def _call_api(api_to_call):
@@ -202,9 +187,6 @@ class CallApi:
 
                 if subscription_id:
                     logger.info('Subscribed to feed on twin %s', twin.id.value)
-                    # Optional call to get the feed's most recent data via the InterestApi
-                    # This call is not needed to perform a follow
-                    self.get_most_recent_data(twin.id.value, 'call_api')
 
         for search_resp in search_resp_gen_template_handler:
             for twin in search_resp.twins:
@@ -223,9 +205,6 @@ class CallApi:
 
                 if subscription_id:
                     logger.info('Subscribed to feed on twin %s', twin.id.value)
-                    # Optional call to get the feed's most recent data via the InterestApi
-                    # This call is not needed to perform a follow
-                    self.get_most_recent_data(twin.id.value, 'template_filled_in')
 
     def _get_data_from_queue(self):
         api_to_call = self._data_to_fetch_queue.get()
@@ -244,42 +223,40 @@ class CallApi:
 
         return twin_id, feed_name
 
-    @staticmethod
-    def _encode_data(data):
-        json_data = json.dumps(data)
+    def _share_feed_data(self, twin_id: str, feed_name: str, api_data):
+        non_encoded_data = {
+            'data': api_data,
+            'template_id': 'weather_forecast'
+        }
+        json_data = json.dumps(non_encoded_data)
         try:
             base64_encoded_data = base64.b64encode(json_data.encode()).decode()
         except TypeError as err:
-            logger.exception('An error occurred when encoding the data %s: %s', data, err)
-            return None
+            raise CallApiBaseException(
+                f'Can not encode data to share from {twin_id}/{feed_name}: {err}, {json_data}'
+            ) from err
 
-        return base64_encoded_data
+        self.feed_api.share_feed_data(
+            twin_id, feed_name,
+            data=base64_encoded_data, mime='application/json',
+            occurred_at=datetime.now(tz=timezone.utc).isoformat()
+        )
 
-    def _share_data(self, data_to_share):
-        twin = data_to_share.twin
-        twin_id = train_twin.twin_id
-        data = data_to_share.data
+        return non_encoded_data
+
+    def publish(self, twin_id: str, feed_name: str, api_data):
+        """Publish a new random temperature in Celsius."""
 
         try:
-            api = twin.twin_api
-            api.share_feed_data(
-                twin_id=train_twin.twin_id,
-                feed_id=data_source_response.capitalize(),
-                data=self._encode_data(data),
-                mime='application/json',
-                occurred_at=data_to_share.timestamp
-            )
-        except Exception:  # pylint: disable=W0703
-            logger.exception(
-                'An exception occurred when publishing %s for %s',
-                data, train_id, exc_info=is_enabled_for_debug()
-            )
+            non_encoded_data = self._share_feed_data(twin_id, feed_name, api_data)
+        except DataSourcesQApiError as err:
+            logger.error('Publishing QAPI error: %s', err, exc_info=is_enabled_for_debug())
         else:
-            logger.debug('Shared data %s for train %s', data, train_id)
+            logger.info('Published %s', non_encoded_data)
 
     def run(self):
         logger.info('Synthesiser started')
-        self._setup()
+        twin_id, feed_name = self._setup()
 
         while True:
             self.follow_twins()
@@ -289,9 +266,7 @@ class CallApi:
                 logger.info('api_to_call: %s', api_to_call)
                 api_data = self._call_api(api_to_call)
                 logger.info('api_data = %s', api_data)
-                self._share_data(api_data)
-
-                # self._process_data(api_data)
+                self.publish(twin_id, feed_name, api_data)
 
 
 def run_follower():
