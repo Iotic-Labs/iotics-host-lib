@@ -50,8 +50,16 @@ class SearchStompListener(ConnectionListener):
         self.errors = defaultdict(list)
 
     def on_message(self, headers: dict, body):
-        tx_ref, page = headers[TXREF_HEADER].split('_page')
-        page = int(page or 0)
+        tx_ref, _, page = headers[TXREF_HEADER].partition('_page')
+
+        try:
+            page = int(page)
+        except (ValueError, TypeError):
+            logger.error(
+                'Received a message without an integer page number. Ignoring it. body: %s headers: %s', body, headers
+            )
+            return
+
         try:
             response = deserialize(body, SearchResponsePayload)
             assert isinstance(response.twins, list), 'Response does not have twins list'
@@ -83,7 +91,9 @@ class SearchStompListener(ConnectionListener):
                 self.regenerate_token = True
         except Exception as ex:  # pylint: disable=broad-except
             error = 'Deserialization error: %s' % ex
-        tx_ref, _ = headers[TXREF_HEADER].split('_page')
+
+        # get tx_ref. Note that the subscription shared across all searches doesn't have a page
+        tx_ref, _, _ = headers[TXREF_HEADER].partition('_page')
         self.errors[tx_ref].append(error)
 
     def on_connected(self, headers: dict, body):
