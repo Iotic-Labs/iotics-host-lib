@@ -75,6 +75,10 @@ class {{cookiecutter.follower_class_name}}:
             followed_twin_id=followed_twin_id,
             feed_id=feed_id
         )
+        if not most_recent_data.feed_data:
+            logger.info('No most recent data found.')
+            return
+
         decoded_data = base64.b64decode(most_recent_data.feed_data.data).decode()
         temperature = json.loads(decoded_data)
         logger.info('Most recent data %s', temperature)
@@ -99,10 +103,11 @@ class {{cookiecutter.follower_class_name}}:
             logger.info('No twins found')
             return
 
+        found_twins = 0
+        subscription_count = 0
         for search_resp in search_resp_gen:
             for twin in search_resp.twins:
-                subscription_id = None
-
+                found_twins += 1
                 try:
                     # follow twin's feed
                     subscription_id = self.follow_api.subscribe_to_feed(
@@ -113,10 +118,13 @@ class {{cookiecutter.follower_class_name}}:
                     break
 
                 if subscription_id:
+                    subscription_count += 1
                     logger.info('Subscribed to feed on twin %s', twin.id.value)
                     # Optional call to get the feed's most recent data via the InterestApi
                     # This call is not needed to perform a follow
                     self.get_most_recent_data(twin.id.value, 'random_temperature_feed')
+
+        logger.info('Found %s twins; subscribed to %s new feeds.', found_twins, subscription_count)
 
     def run(self):
         logger.info('Follower started')
