@@ -1,5 +1,6 @@
 import logging
 from functools import partial
+from time import sleep
 from typing import Callable, Optional, Tuple
 
 import shortuuid
@@ -38,6 +39,8 @@ class FollowStompListener(ConnectionListener):
     def on_disconnected(self):
         logger.warning('Stomp Follow disconnected')
         if self._disconnect_handler:
+            logger.debug('Attempting reconnect in 1s')
+            sleep(1)
             self._disconnect_handler()
 
     @staticmethod
@@ -109,6 +112,7 @@ class FollowAPI:
         self.client.set_listener(f'{self.client_app_id} follow listener', self.listener)
         if self.listener.regenerate_token:
             self.token = self.agent_auth.make_agent_auth_token()
+            self.listener.regenerate_token = False
         self.listener.clear()
         self.client.connect(wait=True, passcode=self.token)
 
@@ -117,8 +121,6 @@ class FollowAPI:
         except Exception as ex:  # pylint: disable=broad-except
             logger.exception('Error subscribing to topics, disconnecting')
             raise DataSourcesStompNotConnected from ex
-
-        self.listener.regenerate_token = False
 
     def disconnect(self):
         """As there is no public reconnect method, this renders the instance inoperable.
@@ -137,7 +139,7 @@ class FollowAPI:
             self.client.subscribe(topic, id=sub_id, headers=headers)
             self._check_receipt(topic)
 
-    @retry(exceptions=KeyError, tries=100, delay=0.1)
+    @retry(exceptions=KeyError, tries=10, delay=1)
     def _check_receipt(self, topic: str):
         error = self.listener.errors.pop(topic, None)
         if error:
