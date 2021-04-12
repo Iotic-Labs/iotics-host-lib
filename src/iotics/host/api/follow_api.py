@@ -13,7 +13,7 @@ from stomp.exception import StompException
 from iotics.host.api.utils import deserialize, get_stomp_error_message
 from iotics.host.auth import AgentAuth
 from iotics.host.conf.base import DataSourcesConfBase
-from iotics.host.exceptions import DataSourcesStompError, DataSourcesStompNotConnected
+from iotics.host.exceptions import DataSourcesFollowTimeout, DataSourcesStompError, DataSourcesStompNotConnected
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,10 @@ class FollowStompListener(ConnectionListener):
         if self._disconnect_handler:
             logger.debug('Attempting reconnect in 1s')
             sleep(1)
-            self._disconnect_handler()
+            try:
+                self._disconnect_handler()
+            except Exception as ex:
+                raise DataSourcesStompNotConnected(ex) from ex
 
     @staticmethod
     def to_interest_fetch_response(headers: dict, body) -> FetchInterestResponse:
@@ -95,7 +98,10 @@ class FollowAPI:
         self._subscriptions = {}
         self.token = agent_auth.make_agent_auth_token()
         self.verify_ssl = config.verify_ssl
-        parametrized_connect()
+        try:
+            parametrized_connect()
+        except Exception as ex:
+            raise DataSourcesStompNotConnected(ex) from ex
 
     def _connect(self, reconnect_attempts_max: int, heartbeats: Tuple[int, int]):
         """this method also used to handle reconnecting to stomp server if e.g. network connection goes down
@@ -116,11 +122,7 @@ class FollowAPI:
         self.listener.clear()
         self.client.connect(wait=True, passcode=self.token)
 
-        try:
-            self._resubscribe_all()
-        except Exception as ex:  # pylint: disable=broad-except
-            logger.exception('Error subscribing to topics, disconnecting')
-            raise DataSourcesStompNotConnected from ex
+        self._resubscribe_all()
 
     def disconnect(self):
         """As there is no public reconnect method, this renders the instance inoperable.
@@ -140,13 +142,13 @@ class FollowAPI:
             try:
                 self._check_receipt(topic)
             except KeyError as ex:
-                raise DataSourcesStompNotConnected('Did not get receipt subscribing to %s' % topic) from ex
+                raise DataSourcesFollowTimeout('Did not get receipt subscribing to %s' % topic) from ex
 
     @retry(exceptions=KeyError, tries=100, delay=0.1, logger=None)
     def _check_receipt(self, topic: str):
         error = self.listener.errors.pop(topic, None)
         if error:
-            raise DataSourcesStompNotConnected('Error subscribing to %s: %s' % (topic, error))
+            raise DataSourcesStompError('Error subscribing to %s: %s' % (topic, error))
 
         self.listener.receipts.remove(topic)
         logger.debug('Successfully subscribed to %s', topic)
@@ -213,13 +215,10 @@ class FollowAPI:
             self.client.subscribe(topic, id=subscription_id, headers=headers)
         except StompException as ex:
             raise DataSourcesStompNotConnected from ex
-        except Exception as ex:  # noqa: E722 pylint: disable=W0703
-            logger.exception('Could not subscribe to topic %s', topic)
-            raise DataSourcesStompError from ex
         try:
             self._check_receipt(topic)
         except KeyError as ex:
-            raise DataSourcesStompNotConnected('Did not get receipt subscribing to %s' % topic) from ex
+            raise DataSourcesFollowTimeout('Did not get receipt subscribing to %s' % topic) from ex
 
         self._subscriptions[topic] = (callback, subscription_id)
 

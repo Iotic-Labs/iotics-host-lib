@@ -142,7 +142,7 @@ def test_api_disconnect_reconnect(mock_connected_api):
     assert api.active
     # OSError - raised if tests are run in a Docker container:
     # https://medium.com/it-dead-inside/docker-containers-and-localhost-cannot-assign-requested-address-6ac7bc0d042b
-    with pytest.raises((ConnectionRefusedError, OSError)):
+    with pytest.raises(DataSourcesStompNotConnected):
         # Tries to reconnect and raises an error since no real connection is set.
         api.listener.on_disconnected()
     api.disconnect()

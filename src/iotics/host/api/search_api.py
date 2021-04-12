@@ -108,7 +108,10 @@ class SearchStompListener(ConnectionListener):
         if self._disconnect_handler:
             logger.debug('Attempting reconnect in 1s')
             sleep(1)
-            self._disconnect_handler()
+            try:
+                self._disconnect_handler()
+            except Exception as ex:
+                raise DataSourcesStompNotConnected(ex) from ex
 
 
 class SearchAPI:
@@ -127,7 +130,10 @@ class SearchAPI:
         self._subscribe_headers = dict(**self._get_headers(), receipt=self.sub_topic)
         self.token = agent_auth.make_agent_auth_token()
         self.verify_ssl = config.verify_ssl
-        parametrized_connect()
+        try:
+            parametrized_connect()
+        except Exception as ex:
+            raise DataSourcesStompNotConnected(ex) from ex
 
     def _connect(self, reconnect_attempts_max: int, heartbeats: Tuple[int, int]):
         """also used to handle reconnecting to stomp server if e.g. network connection goes down
@@ -163,7 +169,7 @@ class SearchAPI:
     def _check_receipt(self, topic: str):
         error = self.listener.errors.pop(topic, None)
         if error:
-            raise DataSourcesStompNotConnected('Error subscribing to %s: %s' % (topic, error))
+            raise DataSourcesStompError('Error subscribing to %s: %s' % (topic, error))
 
         self.listener.receipts.remove(topic)
 
