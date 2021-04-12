@@ -147,7 +147,10 @@ class SearchAPI:
         self.listener.clear()
         self.client.connect(wait=True, passcode=self.token)
         self.client.subscribe(self.sub_topic, id='search_subid', headers=self._subscribe_headers)
-        self._check_receipt(self.sub_topic)
+        try:
+            self._check_receipt(self.sub_topic)
+        except KeyError as ex:
+            raise DataSourcesStompNotConnected('Did not get receipt subscribing to %s' % self.sub_topic) from ex
 
     def disconnect(self):
         """As there is no public reconnect method, this renders the instance inoperable.
@@ -156,7 +159,7 @@ class SearchAPI:
         self.client.remove_listener(f'{self.client_app_id} search listener')
         self.client.disconnect()
 
-    @retry(exceptions=KeyError, tries=10, delay=1)
+    @retry(exceptions=KeyError, tries=100, delay=0.1, logger=None)
     def _check_receipt(self, topic: str):
         error = self.listener.errors.pop(topic, None)
         if error:

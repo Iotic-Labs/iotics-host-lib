@@ -66,7 +66,7 @@ class FollowStompListener(ConnectionListener):
             self._message_handler(headers, deserialised_resp)
 
     def on_error(self, headers: dict, body):
-        logging.error('Received stomp error body: %s headers: %s', body, headers)
+        logger.error('Received stomp error body: %s headers: %s', body, headers)
         try:
             # This will be improved once https://ioticlabs.atlassian.net/browse/FO-1889 will be done
             error = get_stomp_error_message(body) or 'No error body'
@@ -137,9 +137,12 @@ class FollowAPI:
             headers = self._get_headers(sub_id)
             headers.update({'receipt': topic})
             self.client.subscribe(topic, id=sub_id, headers=headers)
-            self._check_receipt(topic)
+            try:
+                self._check_receipt(topic)
+            except KeyError as ex:
+                raise DataSourcesStompNotConnected('Did not get receipt subscribing to %s' % topic) from ex
 
-    @retry(exceptions=KeyError, tries=10, delay=1)
+    @retry(exceptions=KeyError, tries=100, delay=0.1, logger=None)
     def _check_receipt(self, topic: str):
         error = self.listener.errors.pop(topic, None)
         if error:
@@ -208,12 +211,15 @@ class FollowAPI:
 
         try:
             self.client.subscribe(topic, id=subscription_id, headers=headers)
-            self._check_receipt(topic)
         except StompException as ex:
             raise DataSourcesStompNotConnected from ex
         except Exception as ex:  # noqa: E722 pylint: disable=W0703
             logger.exception('Could not subscribe to topic %s', topic)
             raise DataSourcesStompError from ex
+        try:
+            self._check_receipt(topic)
+        except KeyError as ex:
+            raise DataSourcesStompNotConnected('Did not get receipt subscribing to %s' % topic) from ex
 
         self._subscriptions[topic] = (callback, subscription_id)
 
