@@ -13,7 +13,7 @@ from stomp.exception import StompException
 from iotics.host.api.utils import deserialize, get_stomp_error_message
 from iotics.host.auth import AgentAuth
 from iotics.host.conf.base import DataSourcesConfBase
-from iotics.host.exceptions import DataSourcesStompError, DataSourcesStompNotConnected
+from iotics.host.exceptions import DataSourcesFollowTimeout, DataSourcesStompError, DataSourcesStompNotConnected
 
 logger = logging.getLogger(__name__)
 
@@ -140,13 +140,13 @@ class FollowAPI:
             try:
                 self._check_receipt(topic)
             except KeyError as ex:
-                raise DataSourcesStompNotConnected('Did not get receipt subscribing to %s' % topic) from ex
+                raise DataSourcesFollowTimeout('Did not get receipt subscribing to %s' % topic) from ex
 
     @retry(exceptions=KeyError, tries=100, delay=0.1, logger=None)
     def _check_receipt(self, topic: str):
         error = self.listener.errors.pop(topic, None)
         if error:
-            raise DataSourcesStompNotConnected('Error subscribing to %s: %s' % (topic, error))
+            raise DataSourcesStompError('Error subscribing to %s: %s' % (topic, error))
 
         self.listener.receipts.remove(topic)
         logger.debug('Successfully subscribed to %s', topic)
@@ -213,13 +213,10 @@ class FollowAPI:
             self.client.subscribe(topic, id=subscription_id, headers=headers)
         except StompException as ex:
             raise DataSourcesStompNotConnected from ex
-        except Exception as ex:  # noqa: E722 pylint: disable=W0703
-            logger.exception('Could not subscribe to topic %s', topic)
-            raise DataSourcesStompError from ex
         try:
             self._check_receipt(topic)
         except KeyError as ex:
-            raise DataSourcesStompNotConnected('Did not get receipt subscribing to %s' % topic) from ex
+            raise DataSourcesFollowTimeout('Did not get receipt subscribing to %s' % topic) from ex
 
         self._subscriptions[topic] = (callback, subscription_id)
 

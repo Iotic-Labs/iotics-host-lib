@@ -151,13 +151,13 @@ def test_api_disconnect_reconnect(mock_connected_api):
     api.listener.on_disconnected()
 
 
-def test_expected_error_raised_on_connection_failure():
+def test_expected_error_raised_on_subscription_failure():
     with patch('iotics.host.api.search_api.StompWSConnection12', autospec=True):
         with patch('iotics.host.api.search_api.SearchStompListener') as mock_listener:
             error_msg = 'Dummy error'
             mock_listener.return_value.errors = {SearchAPI.sub_topic: error_msg}
             expected_error_msg = f'Error subscribing to {SearchAPI.sub_topic}: {error_msg}'
-            with pytest.raises(DataSourcesStompNotConnected, match=expected_error_msg):
+            with pytest.raises(DataSourcesStompError, match=expected_error_msg):
                 QApiFactory(ConfTest(), AgentAuthTest()).get_search_api()
 
 

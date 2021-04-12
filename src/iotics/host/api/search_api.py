@@ -163,7 +163,7 @@ class SearchAPI:
     def _check_receipt(self, topic: str):
         error = self.listener.errors.pop(topic, None)
         if error:
-            raise DataSourcesStompNotConnected('Error subscribing to %s: %s' % (topic, error))
+            raise DataSourcesStompError('Error subscribing to %s: %s' % (topic, error))
 
         self.listener.receipts.remove(topic)
 
