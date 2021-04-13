@@ -41,13 +41,19 @@ class DataSourcesSearchTimeout(DataSourcesError):
     """
 
 
+class DataSourcesFollowTimeout(DataSourcesError):
+    """
+    Follow timeout exception
+    """
+
+
 class DataSourcesStompError(DataSourcesError):
     """
-    Stomp error message received
+    Stomp error message received. This causes stomp to disconnect and reconnect
     """
 
 
 class DataSourcesStompNotConnected(DataSourcesError):
     """
-     Stomp not currently connected, this library is trying to reconnect, calling code should wait and try the call again
+     Stomp not connected
     """
