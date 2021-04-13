@@ -3,7 +3,7 @@ from functools import partial
 import json
 import logging
 from queue import Empty, Queue
-import time
+from time import monotonic, sleep
 from typing import Callable, Generator, Tuple
 from threading import Lock
 
@@ -72,7 +72,11 @@ class SearchStompListener(ConnectionListener):
 
             if len(response.twins) >= PAGE_LENGTH:
                 with self.page_lock:
-                    search_function, last_page = self.searches[tx_ref]
+                    try:
+                        search_function, last_page = self.searches[tx_ref]
+                    except KeyError:
+                        logger.warning('%s is not a search that was submitted by this API instance!', tx_ref)
+                        return
                     if page == last_page:
                         search_function(page=page + 1)
                         self.searches[tx_ref] = search_function, page + 1
@@ -102,8 +106,12 @@ class SearchStompListener(ConnectionListener):
     def on_disconnected(self):
         logger.warning('Stomp Search disconnected')
         if self._disconnect_handler:
-            logger.debug('Attempting reconnect')
-            self._disconnect_handler()
+            logger.debug('Attempting reconnect in 1s')
+            sleep(1)
+            try:
+                self._disconnect_handler()
+            except Exception as ex:
+                raise DataSourcesStompNotConnected(ex) from ex
 
 
 class SearchAPI:
@@ -122,7 +130,10 @@ class SearchAPI:
         self._subscribe_headers = dict(**self._get_headers(), receipt=self.sub_topic)
         self.token = agent_auth.make_agent_auth_token()
         self.verify_ssl = config.verify_ssl
-        parametrized_connect()
+        try:
+            parametrized_connect()
+        except Exception as ex:
+            raise DataSourcesStompNotConnected(ex) from ex
 
     def _connect(self, reconnect_attempts_max: int, heartbeats: Tuple[int, int]):
         """also used to handle reconnecting to stomp server if e.g. network connection goes down
@@ -138,11 +149,14 @@ class SearchAPI:
         self.client.set_listener(f'{self.client_app_id} search listener', self.listener)
         if self.listener.regenerate_token:
             self.token = self.agent_auth.make_agent_auth_token()
+            self.listener.regenerate_token = False
         self.listener.clear()
         self.client.connect(wait=True, passcode=self.token)
         self.client.subscribe(self.sub_topic, id='search_subid', headers=self._subscribe_headers)
-        self._check_receipt(self.sub_topic)
-        self.listener.regenerate_token = False
+        try:
+            self._check_receipt(self.sub_topic)
+        except KeyError as ex:
+            raise DataSourcesStompNotConnected('Did not get receipt subscribing to %s' % self.sub_topic) from ex
 
     def disconnect(self):
         """As there is no public reconnect method, this renders the instance inoperable.
@@ -151,11 +165,11 @@ class SearchAPI:
         self.client.remove_listener(f'{self.client_app_id} search listener')
         self.client.disconnect()
 
-    @retry(exceptions=KeyError, tries=100, delay=0.1)
+    @retry(exceptions=KeyError, tries=100, delay=0.1, logger=None)
     def _check_receipt(self, topic: str):
         error = self.listener.errors.pop(topic, None)
         if error:
-            raise DataSourcesStompNotConnected('Error subscribing to %s: %s' % (topic, error))
+            raise DataSourcesStompError('Error subscribing to %s: %s' % (topic, error))
 
         self.listener.receipts.remove(topic)
 
@@ -234,7 +248,7 @@ class SearchAPI:
             location=location_filter, properties=properties, text=text))
 
         tx_ref = f'txref-{shortuuid.ShortUUID().random(length=10)}'
-        timeout_end = time.monotonic() + timeout
+        timeout_end = monotonic() + timeout
         search_function = partial(self._get_results_page, payload, tx_ref, timeout_end, scope)
         self.listener.searches[tx_ref] = search_function, 0
         search_function(page=0)
@@ -243,7 +257,7 @@ class SearchAPI:
             results = self.listener.results[tx_ref]
             while True:
                 try:
-                    result = results.get(timeout=max(timeout_end - time.monotonic(), 0))
+                    result = results.get(timeout=max(timeout_end - monotonic(), 0))
                 except Empty:
                     if results.responses:  # We ignore errors if any host has returned successfully
                         break
@@ -265,7 +279,7 @@ class SearchAPI:
         """
 
         # no-op if this search's timeout has been reached.
-        if time.monotonic() > timeout_end:
+        if monotonic() > timeout_end:
             return
 
         search_headers = self._get_headers(f'{tx_ref}_page{page}')
