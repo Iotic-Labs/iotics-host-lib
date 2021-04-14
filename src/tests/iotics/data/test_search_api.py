@@ -3,6 +3,7 @@ import logging
 from unittest.mock import MagicMock, patch
 
 import pytest
+import retry
 from stomp.exception import NotConnectedException
 
 from iotics.host.api.qapi import QApiFactory
@@ -143,8 +144,11 @@ def test_api_disconnect_reconnect(mock_connected_api):
     # OSError - raised if tests are run in a Docker container:
     # https://medium.com/it-dead-inside/docker-containers-and-localhost-cannot-assign-requested-address-6ac7bc0d042b
     with pytest.raises(DataSourcesStompNotConnected):
-        # Tries to reconnect and raises an error since no real connection is set.
-        api.listener.on_disconnected()
+        # Ignore retry functionality.
+        with patch.object(retry.api, '__retry_internal', lambda f, *args, **kwargs: f()):
+            # Tries to reconnect and raises an error since no real connection is set.
+            api.listener.on_disconnected()
+
     api.disconnect()
     assert not api.active
     # Once disconnected it should not try to reconnect (should not raise the ConnectionRefusedError).

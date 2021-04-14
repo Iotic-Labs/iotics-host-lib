@@ -135,6 +135,7 @@ class SearchAPI:
         except Exception as ex:
             raise DataSourcesStompNotConnected(ex) from ex
 
+    @retry(exceptions=ConnectionError, delay=1, backoff=10, max_delay=3600)
     def _connect(self, reconnect_attempts_max: int, heartbeats: Tuple[int, int]):
         """also used to handle reconnecting to stomp server if e.g. network connection goes down
         """
