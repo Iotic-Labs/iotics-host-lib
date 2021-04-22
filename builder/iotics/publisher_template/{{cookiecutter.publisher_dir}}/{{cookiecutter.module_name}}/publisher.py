@@ -32,7 +32,8 @@ class {{cookiecutter.publisher_class_name}}:
 {% if cookiecutter.add_example_code == "NO" %}
     def __init__(self, agent_auth: AgentAuth, qapi_factory: QApiFactory):
         # TODO: update the publisher parameters
-        self.qapi_factory = qapi_factory
+        self.twin_api = qapi_factory.get_twin_api()
+        self.feed_api = qapi_factory.get_feed_api()
         self.agent_auth = agent_auth
 
     def run(self):
@@ -41,7 +42,8 @@ class {{cookiecutter.publisher_class_name}}:
 {% else %}
     def __init__(self, agent_auth: AgentAuth, qapi_factory: QApiFactory, update_frequency_seconds: float):
         self.update_frequency_seconds = update_frequency_seconds
-        self.qapi_factory = qapi_factory
+        self.twin_api = qapi_factory.get_twin_api()
+        self.feed_api = qapi_factory.get_feed_api()
         self.agent_auth = agent_auth
 
     def _create_twin(self) -> str:
@@ -49,40 +51,36 @@ class {{cookiecutter.publisher_class_name}}:
         twin_id, _, _ = self.agent_auth.make_twin_id(TWIN_NAME)
 
         # Create the twin
-        api = self.qapi_factory.get_twin_api()
-        api.create_twin(twin_id)
+        self.twin_api.create_twin(twin_id)
         return twin_id
 
     def _set_twin_meta(self, twin_id: str):
         label = 'Random awesome twin'
         description = 'Awesome twin for random data'
-        api = self.qapi_factory.get_twin_api()
 
         # Set twin location to London
         # This will make the twin visible in Iotics Cloud and it will enable the search by location.
         london_location = GeoLocationUpdate(location=GeoLocation(lat=51.507359, lon=-0.136439))
 
-        api.update_twin(
+        self.twin_api.update_twin(
             twin_id,
             add_tags=['random', 'awesome'],
             add_labels=[LangLiteral(value=label, lang='en')],
             add_comments=[LangLiteral(value=description, lang='en')],
             location=london_location,
         )
-        logging.info('Created Twin %s', api.describe_twin(twin_id=twin_id))
+        logging.info('Created Twin %s', self.twin_api.describe_twin(twin_id=twin_id))
 
     def _create_feed(self, twin_id: str) -> str:
-        api = self.qapi_factory.get_feed_api()
         feed_name = 'random_temperature_feed'
-        api.create_feed(twin_id, feed_name)
+        self.feed_api.create_feed(twin_id, feed_name)
         return feed_name
 
     def _set_feed_meta(self, twin_id: str, feed_name: str):
         label = 'Random temperature feed'
         description = f'Awesome feed generating a temperature in Celsius each {self.update_frequency_seconds} seconds'
-        api = self.qapi_factory.get_feed_api()
 
-        api.update_feed(
+        self.feed_api.update_feed(
             twin_id, feed_name,
             add_labels=[LangLiteral(value=label, lang='en')],
             add_comments=[LangLiteral(value=description, lang='en')],
@@ -96,7 +94,7 @@ class {{cookiecutter.publisher_class_name}}:
                       unit='http://purl.obolibrary.org/obo/UO_0000027'),
             ]
         )
-        logging.info('Created Feed %s', api.describe_feed(twin_id=twin_id, feed_id=feed_name))
+        logging.info('Created Feed %s', self.feed_api.describe_feed(twin_id=twin_id, feed_id=feed_name))
 
     def _share_feed_data(self, twin_id: str, feed_name: str):
         non_encoded_data = {
@@ -110,8 +108,7 @@ class {{cookiecutter.publisher_class_name}}:
                 f'Can not encode data to share from {twin_id}/{feed_name}: {err}, {json_data}'
             ) from err
 
-        api = self.qapi_factory.get_feed_api()
-        api.share_feed_data(
+        self.feed_api.share_feed_data(
             twin_id, feed_name,
             data=base64_encoded_data, mime='application/json',
             occurred_at=datetime.now(tz=timezone.utc).isoformat()

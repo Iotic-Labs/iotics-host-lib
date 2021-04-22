@@ -197,7 +197,7 @@ export QAPI_STOMP_URL=[address of qapi]
 export RESOLVER_HOST=[address of resolver for your space]
 
 # next either
-make docker-run-host # Run using the docker image
+make docker-run # Run using the docker image
 # OR
 python3 -mvenv env
 source ./env/bin/activate
