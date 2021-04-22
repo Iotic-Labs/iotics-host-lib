@@ -39,7 +39,7 @@ QAPI_STOMP_URL ?= ws://localhost:8080/ws
 RESOLVER_HOST ?= http://localhost:5000
 VERIFY_SSL ?= False
 
-docker-run-host: docker-build  ## Docker run of the follower against a running host (see README)
+docker-run: docker-build  ## Docker run of the follower against a running host (see README)
 	$Q docker run --rm --network host \
 		-e {{cookiecutter.conf_env_var_prefix}}QAPI_URL=$(QAPI_URL)	\
 		-e {{cookiecutter.conf_env_var_prefix}}QAPI_STOMP_URL=$(QAPI_STOMP_URL)	\

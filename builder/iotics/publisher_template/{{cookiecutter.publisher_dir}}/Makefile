@@ -38,7 +38,7 @@ QAPI_URL ?= http://localhost:8081/qapi
 RESOLVER_HOST ?= http://localhost:5000
 VERIFY_SSL ?= False
 
-docker-run-host: docker-build  ## Docker run of the publisher against a running host (see README)
+docker-run: docker-build  ## Docker run of the publisher against a running host (see README)
 	$Q docker run --rm --network host \
 		-e {{cookiecutter.conf_env_var_prefix}}QAPI_URL=$(QAPI_URL)	\
 		-e {{cookiecutter.conf_env_var_prefix}}AUTH__RESOLVER_HOST=$(RESOLVER_HOST) \

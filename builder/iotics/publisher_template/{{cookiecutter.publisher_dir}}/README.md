@@ -17,20 +17,18 @@ def _create_twin(self) -> str:
     twin_id, _, _ = self.agent_auth.make_twin_id(TWIN_NAME)
 
     # Create the twin
-    api = self.qapi_factory.get_twin_api()
-    api.create_twin(twin_id)
+    self.twin_api.create_twin(twin_id)
     return twin_id
 
 def _set_twin_meta(self, twin_id: str):
     label = 'Random awesome twin'
     description = 'Awesome twin for random data'
-    api = self.qapi_factory.get_twin_api()
 
     # Set twin location to London
     # This will make the twin visible in Iotics Cloud and it will enable the search by location.
     london_location = GeoLocationUpdate(location=GeoLocation(lat=51.507359, lon=-0.136439))
 
-    api.update_twin(
+    self.twin_api.update_twin(
         twin_id,
         add_tags=['random', 'awesome'],
         add_labels=[LangLiteral(value=label, lang='en')],
@@ -58,7 +56,6 @@ Read more about properties in the Iotics documentation:
 def _set_twin_meta(self, twin_id: str):
     label = 'Random awesome twin'
     description = 'Awesome twin for random data'
-    api = self.qapi_factory.get_twin_api()
 
     # Adding Semantic Meta data via property usage.
     # Here we are setting a "Category" property to this twin.
@@ -66,7 +63,7 @@ def _set_twin_meta(self, twin_id: str):
     category_property = ModelProperty(key='http://data.iotics.com/ns/category',
                                       uri_value=Uri(value='http://data.iotics.com/category/Temperature'))
 
-    api.update_twin(
+    self.twin_api.update_twin(
         twin_id,
         add_tags=['random', 'awesome'],
         add_labels=[LangLiteral(value=label, lang='en')],
@@ -78,17 +75,15 @@ def _set_twin_meta(self, twin_id: str):
 ### Creates a feed and sets its meta data
 ```python
 def _create_feed(self, twin_id: str) -> str:
-    api = self.qapi_factory.get_feed_api()
     feed_name = 'random_temperature_feed'
-    api.create_feed(twin_id, feed_name)
+    self.feed_api.create_feed(twin_id, feed_name)
     return feed_name
 
 def _set_feed_meta(self, twin_id: str, feed_name: str):
     label = 'Random temperature feed'
     description = f'Awesome feed generating a temperature in Celsius each {self.update_frequency_seconds} seconds'
-    api = self.qapi_factory.get_feed_api()
 
-    api.update_feed(
+    self.feed_api.update_feed(
         twin_id, feed_name,
         add_labels=[LangLiteral(value=label, lang='en')],
         add_comments=[LangLiteral(value=description, lang='en')],
@@ -118,8 +113,7 @@ def _share_feed_data(self, twin_id: str, feed_name: str):
             f'Can not encode data to share from {twin_id}/{feed_name}: {err}, {json_data}'
         ) from err
 
-    api = self.qapi_factory.get_feed_api()
-    api.share_feed_data(
+    self.feed_api.share_feed_data(
         twin_id, feed_name,
         data=base64_encoded_data, mime='application/json',
         occurred_at=datetime.now(tz=timezone.utc).isoformat()
@@ -201,7 +195,7 @@ export QAPI_URL=[address of qapi]
 export RESOLVER_HOST=[address of resolver for your space]
 
 # next either
-make docker-run-host # Run using the docker image
+make docker-run # Run using the docker image
 # OR
 python3 -mvenv env
 source ./env/bin/activate
