@@ -10,10 +10,15 @@ TODO: summary
 {% if cookiecutter.add_example_code == "YES" %}
 In `publisher.py` the example:
 
-### Creates a twin and sets its meta data
+### Creates a twin and sets its basic metadata
+All metadata describing twins is stored using the Resource Description Framework ([RDF](https://www.w3. org/TR/rdf11-concepts/)),
+which makes statements about the world using subject-predicate-object triples. For purposes of this walkthrough, think
+of predicates and objects as keys and values describing the subject (usually a Twin or Feed). Certain basic predicates,
+whose values make the twin accessible via text- or location-based searches, have dedicated parameters in the 
+update_twin method. The use of custom predicates will be shown in the next section.
 ```python
 def _create_twin(self) -> str:
-    # Create an twin id in the registerer
+    # Create an twin id in the registrar
     twin_id, _, _ = self.agent_auth.make_twin_id(TWIN_NAME)
 
     # Create the twin
@@ -21,58 +26,60 @@ def _create_twin(self) -> str:
     return twin_id
 
 def _set_twin_meta(self, twin_id: str):
-    label = 'Random awesome twin'
-    description = 'Awesome twin for random data'
+    # The RDF Schema provides "label" and "comment" properties to provide basic details of resources: https://www.w3.org/TR/rdf-schema/#ch_label
+    label = 'Twin 1'  # A human-readable version of the twin's name
+    comment = 'The first twin we made in Iotics'  # Space to put more free text describing the twin
 
-    # Set twin location to London
+    # Set twin location to London, using the GeoLocationUpdate class to provide its latitude and longitude.
     # This will make the twin visible in Iotics Cloud and it will enable the search by location.
     london_location = GeoLocationUpdate(location=GeoLocation(lat=51.507359, lon=-0.136439))
 
+    # More information on the parameters of this method is available in the iotics-host-lib source code.
     self.twin_api.update_twin(
         twin_id,
-        add_tags=['random', 'awesome'],
-        add_labels=[LangLiteral(value=label, lang='en')],
-        add_comments=[LangLiteral(value=description, lang='en')],
-        location=london_location,
+        add_tags=['random', 'awesome'], # Deprecated pre-RDF way of describing twins.
+        add_labels=[LangLiteral(value=label, lang='en')],     # Labels and comments must be language-tagged literals --
+        add_comments=[LangLiteral(value=comment, lang='en')], # see https://www.w3.org/TR/rdf11-concepts/#section-Graph-Literal
+        location=london_location, # Must be instance of GeoLocationUpdate, as constructed above.
     )
 ```
 
 #### Getting started with Iotics Cloud
-In the code snippet above, the London location is added to the twin meta data.
+In the code snippet above, the London location is added to the twin metadata.
 This will make the twin visible in Iotics Cloud.
 Read more about Iotics Cloud in the Iotics documentation: [Getting started with Iotics Cloud](https://docs.iotics.com/docs/getting-started-with-iotics-cloud)
 
 
-#### Adding semantic meta data via property usage
+#### Adding more semantic metadata via custom properties
 
-In the code snippet below, a property is added to the twin while setting the meta data.
-This will allow to run a semantic search based on a set of properties. You can see the follower
-doing this type of search in its `Semantic searches for and follows twins` section.
+In the code snippet below, a custom property is added to the twin while setting the metadata. Custom properties allow
+the user to set the value of the predicate (the `key` parameter), an IRI referencing the definition of the property
+(ie, what sort of thing it describes and how). The object is set using a second parameter, either one of various
+`literal` types or a `uri` -- see the ModelProperty source code.
+
+Twins so decorated may be found in a semantic search based on a set of properties. You can see the follower doing this
+type of search in its `Semantic searches for and follows twins` section.
 Read more about properties in the Iotics documentation:
 - [What is an IOTICS Digital Twin?](https://docs.iotics.com/docs/key-concepts#what-is-an-iotics-digital-twin)
 - [Properties](https://docs.iotics.com/docs/setting-up-a-digital-twin#properties)
 
 ```python
 def _set_twin_meta(self, twin_id: str):
-    label = 'Random awesome twin'
-    description = 'Awesome twin for random data'
-
-    # Adding Semantic Meta data via property usage.
-    # Here we are setting a "Category" property to this twin.
-    # The twin is identified as a "Temperature" twin.
     category_property = ModelProperty(key='http://data.iotics.com/ns/category',
                                       uri_value=Uri(value='http://data.iotics.com/category/Temperature'))
 
     self.twin_api.update_twin(
         twin_id,
-        add_tags=['random', 'awesome'],
-        add_labels=[LangLiteral(value=label, lang='en')],
-        add_comments=[LangLiteral(value=description, lang='en')],
         add_props=[category_property]
     )
 ```
 
-### Creates a feed and sets its meta data
+### Creates a feed and sets its metadata
+Feeds are described using many of the same properties as twins, (eg labels and comments), as shown above. Additionally,
+Feeds have associated Values with details of what sort of data is present in each shared update. For example, the Feed
+below has one Value, explaining that each share will have a decimal number (not a string or boolean, for instance)
+representing degrees Celsius. The `unit` parameter is set to an IRI representing °C in a popular ontology for units of
+measure.
 ```python
 def _create_feed(self, twin_id: str) -> str:
     feed_name = 'random_temperature_feed'
@@ -81,12 +88,12 @@ def _create_feed(self, twin_id: str) -> str:
 
 def _set_feed_meta(self, twin_id: str, feed_name: str):
     label = 'Random temperature feed'
-    description = f'Awesome feed generating a temperature in Celsius each {self.update_frequency_seconds} seconds'
+    comment = f'Awesome feed generating a temperature in Celsius each {self.update_frequency_seconds} seconds'
 
     self.feed_api.update_feed(
         twin_id, feed_name,
         add_labels=[LangLiteral(value=label, lang='en')],
-        add_comments=[LangLiteral(value=description, lang='en')],
+        add_comments=[LangLiteral(value=comment, lang='en')],
         # Whether this feed's most recent data can be retrieved via the InterestApi
         store_last=True,
         add_tags=['random', 'awesome'],
@@ -100,6 +107,8 @@ def _set_feed_meta(self, twin_id: str, feed_name: str):
 ```
 
 ### Publishes data to the feed
+The data shared to a Feed should be a base64-encoded dict keyed with the Feed's Value labels. You may also explicitly
+set a time associated with this share.
 ```python
 def _share_feed_data(self, twin_id: str, feed_name: str):
     non_encoded_data = {
@@ -179,7 +188,7 @@ export RESOLVER_HOST=https://your.resolver
 export HOST_USER=did:iotics:iot1234567890aBcDeFgHiJkLmNoPQrStUvW
 export SEED=000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
 ```
-Those should be kept safe and be present in the environment in which you are running your connector.  
+Those should be kept safe and be present in the environment in which you are running your connector.
 If you are using the same user for a publisher component and a follower component, you can reuse the same
 USER SEED, but **note that this should NOT be stored in production environment with your component,
 instead keep it safe and secure elsewhere**. The seed can be stored and recognised by the `gen_creds.py`.
