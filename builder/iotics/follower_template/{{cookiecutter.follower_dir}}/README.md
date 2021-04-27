@@ -19,7 +19,10 @@ In `follower.py` the example:
 ```
 
 ### Text based searches for and follows twins
-This search will return twins with matching text in their or their feeds' labels, descriptions or tags. You can see the publisher adding such a tag to the twins it creates in its `_set_twin_meta` method.
+This search will return twins with matching text in their or their feeds' labels, descriptions or tags. You can see the
+publisher adding such a tag to the twins it creates in its `_set_twin_meta` method. Once found, these twins have their
+'random_temperature_feed' subscribed to by the follower, and a callback is set that will fire whenever data is shared to
+this feed.
 ```python
 def follow_twins(self):
     """Find and follow twins"""
@@ -48,13 +51,14 @@ def follow_twins(self):
 
 
 ### Semantic based searches for and follows twins
-The generated example searches for twins using a text based search, you can however search using semantics.
-The search in the example code snippet below, will return the twins identified with the *Temperature Category*
-(ie it will return the twins including this Category in their meta data properties).
-You can see how to add semantic meta data in the `Adding semantic meta data via property usage` section
-in the README of the publisher.
+The generated example searches for twins using a text based search, but you can also search using custom semantic
+properties. The search in the example code snippet below, will return the twins identified with the *Temperature
+Category* (ie, the twins with a 'category' predicate set to 'Temperature', according to the IRIs used below). You can
+see how to add semantic metadata in the `Adding semantic metadata via property usage` section in the README of the
+publisher.
 
-Note: it is possible to search for the twins identified with a set of properties (a "and" is performed).
+Note: If multiple properties are included in the search, only twins matching all of them will be returned (an "and" is
+performed).
 Read more about search in the Iotics documentation: [How to search](https://docs.iotics.com/docs/how-to-search).
 ```python
 from iotic.web.rest.client.qapi import ModelProperty, Uri
@@ -71,19 +75,29 @@ def follow_twins(self):
 
 
 ...
-
+    # Follow all feeds on all twins in the search result.
+    found_twins = 0
+    subscription_count = 0
     for search_resp in search_resp_gen:
-        for twin in twin_list:
-            subscription_id = None
+        for twin in search_resp.twins:
+            found_twins += 1
+            twin_id = twin.id.value
 
-            try:
-                # follow twin's feed
+            for feed in twin.feeds:
+                feed_id = feed.feed.id.value
                 subscription_id = self.follow_api.subscribe_to_feed(
-                    self.follower_twin_id, twin.id.value, 'random_temperature_feed', self.follow_callback
+                    self.follower_twin_id, twin_id, feed_id, self.follow_callback
                 )
+
+                if subscription_id:
+                    subscription_count += 1
+                    logger.info('Subscribed to feed %s on twin %s', feed_id, twin_id)
+
+    logger.info('Found %s twins; subscribed to %s new feeds.', found_twins, subscription_count)
 ```
 
 ### Logs the received data
+As data is base64-encoded before being shared, it must be decoded before use.
 ```python
 def follow_callback(header, body):  # pylint: disable=W0613
     decoded_data = base64.b64decode(body.payload.feed_data.data).decode('ascii')
@@ -106,12 +120,12 @@ def run(self):
 ```
 
 ### Get feed's most recent data via the InterestApi
-> Get most recent data is available via the InterestApi if the followed feed has the tag `store_last` set to `True`
-> (cf. publisher example)
+A feed's most recent data is available via the InterestApi if the followed feed has the tag `store_last` set to `True`
+(cf. publisher example)
 ```python
 def get_most_recent_data(self, followed_twin_id: str, feed_id: str):
     """ Get feed's most recent data via the InterestApi
-        Note: the feed meta data must include store_last=True
+        Note: the feed metadata must include store_last=True
     """
     logger.info('Get most recent data via InterestApi')
     most_recent_data = self.interest_api.get_feed_last_stored(follower_twin_id=self.follower_twin_id,
@@ -180,7 +194,7 @@ export RESOLVER_HOST=https://your.resolver
 export HOST_USER=did:iotics:iot1234567890aBcDeFgHiJkLmNoPQrStUvW
 export SEED=000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
 ```
-Those should be kept safe and be present in the environment in which you are running your connector.  
+Those should be kept safe and be present in the environment in which you are running your connector.
 If you are using the same user for a publisher component and a follower component, you can reuse the same
 USER SEED, but **note that this should NOT be stored in production environment with your component,
 instead keep it safe and secure elsewhere**. The seed can be stored and recognised by the `gen_creds.py`.
