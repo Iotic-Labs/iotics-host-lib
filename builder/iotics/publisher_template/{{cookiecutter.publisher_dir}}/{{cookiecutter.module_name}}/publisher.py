@@ -117,7 +117,7 @@ class {{cookiecutter.publisher_class_name}}:
         return non_encoded_data
 
     def setup(self):
-        """Create an twin and set its meta data. Create a feed an set its meta data."""
+        """Create an twin and set its metadata. Create a feed an set its metadata."""
 
         logger.info('Publisher setup')
         twin_id = self._create_twin()

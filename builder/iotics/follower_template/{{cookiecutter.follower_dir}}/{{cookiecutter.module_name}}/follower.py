@@ -67,7 +67,7 @@ class {{cookiecutter.follower_class_name}}:
 
     def get_most_recent_data(self, followed_twin_id: str, feed_id: str):
         """ Get feed's most recent data via the InterestApi
-            Note: the feed meta data must include store_last=True
+            Note: the feed metadata must include store_last=True
         """
         logger.info('Get most recent data via InterestApi')
         most_recent_data = self.interest_api.get_feed_last_stored_local(
