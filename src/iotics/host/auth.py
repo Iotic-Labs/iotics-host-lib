@@ -12,11 +12,21 @@ from iotics.host.exceptions import DataSourcesAuthException
 Agent = namedtuple('Agent', ('id', 'pk', 'doc'))
 
 
-class AgentAuth:
-    """AgentAuth: A very basic auth helper for an agent & twins
+class AgentAuth(ABC):
+    @abstractmethod
+    def make_agent_auth_token(self, audience: str, duration: int) -> str:
+        pass
+
+    @abstractmethod
+    def make_twin_id(self, lid: str, agent_deleg: bool) -> tuple:
+        pass
+
+
+class BasicAgentAuth(AgentAuth):
+    """BasicAgentAuth: A very basic auth helper for an agent & twins
 
     Caveats:
-    - Twins should be made using a path on the Agent seed (not their own seed)
+    - Twins are using a path on the Agent seed (not their own seed)
     - Agent & Twins will use the first public key (eg keys not rotated)
     """
 
@@ -70,6 +80,35 @@ class AgentAuth:
             Resolver.register(tkn)
 
         return doc.id, prk, doc
+
+
+class InsertTokenAgentAuth(AgentAuth):
+
+    def __init__(self, token: str, twins: List):
+        self.__token = token
+        self.__twins = twins
+
+    def make_agent_auth_token(self, audience: str, duration: int) -> str:
+        return self.__token
+
+    @abstractmethod
+    def make_twin_id(self, lid: str, agent_deleg: bool) -> tuple:
+        idx = int(lid)
+        doc = discover_identity(self.__twins[idx])
+        return doc.id, None, doc
+
+
+class InsertTokenAuthBuilder:
+    @staticmethod
+    def build_agent_auth(token: str,
+                         twins: List):
+        if not len(token):
+            raise ValueError('token str empty')
+        if not len(twins):
+            raise ValueError('twins list empty')
+        for did in twins:
+            Identifier.validate_identifier(did)
+        return InsertTokenAgentAuth(token, twins)
 
 
 def discover_identity(did) -> Optional[DIDDocument]:
