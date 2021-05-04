@@ -75,16 +75,25 @@ def follow_twins(self):
 
 
 ...
-
+    # Follow all feeds on all twins in the search result.
+    found_twins = 0
+    subscription_count = 0
     for search_resp in search_resp_gen:
-        for twin in twin_list:
-            subscription_id = None
+        for twin in search_resp.twins:
+            found_twins += 1
+            twin_id = twin.id.value
 
-            try:
-                # follow twin's feed
+            for feed in twin.feeds:
+                feed_id = feed.feed.id.value
                 subscription_id = self.follow_api.subscribe_to_feed(
-                    self.follower_twin_id, twin.id.value, 'random_temperature_feed', self.follow_callback
+                    self.follower_twin_id, twin_id, feed_id, self.follow_callback
                 )
+
+                if subscription_id:
+                    subscription_count += 1
+                    logger.info('Subscribed to feed %s on twin %s', feed_id, twin_id)
+
+    logger.info('Found %s twins; subscribed to %s new feeds.', found_twins, subscription_count)
 ```
 
 ### Logs the received data
