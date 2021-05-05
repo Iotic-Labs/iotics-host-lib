@@ -2,6 +2,7 @@ from uuid import uuid4
 
 from iotic.web.rest.client.qapi import ApiClient, FetchInterestResponsePayload, InterestApi as InterestClient
 
+from iotics.host import metrics
 from iotics.host.api.utils import check_and_retry_with_new_token, fill_refs
 from iotics.host.auth import AgentAuth
 
@@ -12,6 +13,7 @@ class InterestApi:
         self.agent_auth = agent_auth
         self.client_app_id = client_app_id
 
+    @metrics.add()
     @check_and_retry_with_new_token
     @fill_refs
     def get_feed_last_stored_local(
@@ -46,6 +48,7 @@ class InterestApi:
             iotics_transaction_ref=transaction_ref
         )
 
+    @metrics.add()
     @check_and_retry_with_new_token
     @fill_refs
     def get_feed_last_stored(

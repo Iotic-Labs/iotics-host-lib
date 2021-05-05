@@ -10,6 +10,7 @@ from retry import retry
 from stomp import ConnectionListener
 from stomp.exception import StompException
 
+from iotics.host import metrics
 from iotics.host.api.utils import deserialize, get_stomp_error_message
 from iotics.host.auth import AgentAuth
 from iotics.host.conf.base import DataSourcesConfBase
@@ -125,6 +126,7 @@ class FollowAPI:
 
         self._resubscribe_all()
 
+    @metrics.add()
     def disconnect(self):
         """As there is no public reconnect method, this renders the instance inoperable.
         """
@@ -171,11 +173,12 @@ class FollowAPI:
             logger.warning('Received message for unsubscribed topic %s', topic)
             return
         try:
-            callback(headers['subscription'], message)
+            metrics.measure(callback, headers['subscription'], message)
         except:  # noqa: E722 pylint: disable=W0702
             logger.exception('Callback error for topic %s', topic)
             return
 
+    @metrics.add()
     def subscribe_to_feed(self, follower_twin_id: str, followed_twin_id: str, followed_feed_name: str,
                           callback: Callable, client_ref: str = None, transaction_ref: str = None,
                           remote_host_id: str = None) -> Optional[str]:
