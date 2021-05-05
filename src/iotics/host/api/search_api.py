@@ -15,6 +15,7 @@ from retry import retry
 from stomp import ConnectionListener
 from stomp.exception import StompException
 
+from iotics.host import metrics
 from iotics.host.api.utils import deserialize, ListOrTuple, sanitize_for_serialization, get_stomp_error_message
 from iotics.host.auth import AgentAuth
 from iotics.host.conf.base import DataSourcesConfBase
@@ -159,6 +160,7 @@ class SearchAPI:
         except KeyError as ex:
             raise DataSourcesStompNotConnected('Did not get receipt subscribing to %s' % self.sub_topic) from ex
 
+    @metrics.add()
     def disconnect(self):
         """As there is no public reconnect method, this renders the instance inoperable.
         """
@@ -182,6 +184,7 @@ class SearchAPI:
                 'Iotics-ClientRef': client_ref,
                 TXREF_HEADER: tx_ref}
 
+    @metrics.add()
     def search_twins(
             self, timeout: int = 10, response_type: ResponseType = ResponseType.FULL, radius_km: float = None,
             lat: float = None, long: float = None, properties: ListOrTuple[ModelProperty] = None, text: str = None,

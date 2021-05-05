@@ -206,3 +206,19 @@ make setup-dev
 
 make run # Run using the sources from your computer
 ```
+
+
+### Monitoring and alerting
+To be able to analyse Iotics Host Library usage Prometheus metrics, ensure you have a Python client installed in your
+Connector's environment: 
+```bash
+pip install prometheus_client
+```
+
+Next add to e.g. `follower.py:run_follower` the following:
+```python
+import prometheus_client
+prometheus_client.start_http_server(8002)
+```
+
+Now you should be able to see metrics per the "Monitoring and alerting" section in the Iotics Host Library readme.

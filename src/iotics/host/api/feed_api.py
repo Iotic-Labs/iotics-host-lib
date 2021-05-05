@@ -5,6 +5,7 @@ from iotic.web.rest.client.qapi import ApiClient, CreateFeedRequestPayload, Crea
     LangLiteral, ListAllFeedsResponsePayload, ShareFeedDataRequestPayload, Tags, UpdateFeedRequestPayload, \
     UpdateFeedResponsePayload, Value, Values
 
+from iotics.host import metrics
 from iotics.host.api.utils import check_and_retry_with_new_token, fill_refs, ListOrTuple
 from iotics.host.auth import AgentAuth
 
@@ -15,6 +16,7 @@ class FeedApi:
         self.agent_auth = agent_auth
         self.client_app_id = client_app_id
 
+    @metrics.add()
     @check_and_retry_with_new_token
     @fill_refs
     def create_feed(
@@ -44,6 +46,7 @@ class FeedApi:
             iotics_transaction_ref=transaction_ref
         )
 
+    @metrics.add()
     @check_and_retry_with_new_token
     @fill_refs
     def list_feeds(
@@ -66,6 +69,7 @@ class FeedApi:
             iotics_transaction_ref=transaction_ref
         )
 
+    @metrics.add()
     @check_and_retry_with_new_token
     @fill_refs
     def delete_feed(
@@ -90,6 +94,7 @@ class FeedApi:
             iotics_transaction_ref=transaction_ref
         )
 
+    @metrics.add()
     @check_and_retry_with_new_token
     @fill_refs
     def describe_feed(
@@ -133,6 +138,7 @@ class FeedApi:
             iotics_transaction_ref=transaction_ref
         )
 
+    @metrics.add()
     @check_and_retry_with_new_token
     @fill_refs
     def describe_remote_feed(
@@ -179,6 +185,7 @@ class FeedApi:
             iotics_transaction_ref=transaction_ref
         )
 
+    @metrics.add()
     @check_and_retry_with_new_token
     @fill_refs
     def update_feed(
@@ -230,6 +237,7 @@ class FeedApi:
             iotics_transaction_ref=transaction_ref
         )
 
+    @metrics.add()
     @check_and_retry_with_new_token
     @fill_refs
     def share_feed_data(
