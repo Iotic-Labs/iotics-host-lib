@@ -5,6 +5,7 @@ from iotic.web.rest.client.qapi import ApiClient, CommentUpdate, CreateTwinReque
     ListAllTwinsResponsePayload, ModelProperty, PropertyUpdate, Tags, TwinApi as TwinClient, TwinID, \
     UpdateTwinRequestPayload, UpdateTwinResponsePayload, Visibility, VisibilityUpdate
 
+from iotics.host import metrics
 from iotics.host.api.utils import check_and_retry_with_new_token, fill_refs, ListOrTuple
 from iotics.host.auth import AgentAuth
 
@@ -15,6 +16,7 @@ class TwinApi:
         self.rest_api_client = rest_api_client
         self.agent_auth = agent_auth
 
+    @metrics.add()
     @check_and_retry_with_new_token
     @fill_refs
     def create_twin(
@@ -43,6 +45,7 @@ class TwinApi:
             iotics_transaction_ref=transaction_ref
         )
 
+    @metrics.add()
     @check_and_retry_with_new_token
     @fill_refs
     def list_twins(self, client_ref: str = None, transaction_ref: str = None) -> ListAllTwinsResponsePayload:
@@ -63,6 +66,7 @@ class TwinApi:
             iotics_transaction_ref=transaction_ref
         )
 
+    @metrics.add()
     @check_and_retry_with_new_token
     @fill_refs
     def delete_twin(
@@ -85,6 +89,7 @@ class TwinApi:
             iotics_transaction_ref=transaction_ref
         )
 
+    @metrics.add()
     @check_and_retry_with_new_token
     @fill_refs
     def describe_twin(
@@ -130,6 +135,7 @@ class TwinApi:
             iotics_transaction_ref=transaction_ref
         )
 
+    @metrics.add()
     @check_and_retry_with_new_token
     @fill_refs
     def describe_remote_twin(
@@ -177,6 +183,7 @@ class TwinApi:
             iotics_transaction_ref=transaction_ref
         )
 
+    @metrics.add()
     @check_and_retry_with_new_token
     @fill_refs
     def update_twin(  # pylint:disable=too-many-arguments,too-many-locals
