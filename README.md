@@ -187,6 +187,35 @@ In the "Explore" view you can use for example the following queries to see Rando
   ([link](http://localhost:3000/explore?orgId=1&left=%5B%22now-1h%22,%22now%22,%22Prometheus%22,%7B%22exemplar%22:true,%22expr%22:%22increase(api_call_count%7Bjob%3D%5C%22random-temp-pub%5C%22,%20function%3D%5C%22share_feed_data%5C%22,%20failed%3D%5C%22True%5C%22%7D%5B1m%5D)%22,%22requestId%22:%22Q-7830e1fd-158f-4b22-8f89-707bb8b83547-0A%22%7D%5D)).
 
 
+#### OSX notes:
+
+The `--network host` flag is not supported on Docker Desktop for Mac.
+
+Instead you can : -
+* Run prometheus: - `docker run -p 9092:9090 --rm --name prometheus -v"$(realpath ./prometheus.yml)":/prometheus/prometheus.yml prom/prometheus:latest --config.file=/prometheus/prometheus.yml`
+* Run grafana: - `docker run --rm --name grafana -p 3000:3000 grafana/grafana`
+* Make the prometheus configuration file point to host using `docker.for.mac.host.internal`
+```yaml
+...
+scrape_configs:
+  # Here it's Prometheus itself.
+  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
+  - job_name: 'prometheus'
+    # metrics_path defaults to '/metrics'
+    # scheme defaults to 'http'.
+    static_configs:
+    - targets: ['localhost:9090']
+
+  - job_name: 'random-temp-pub'
+    static_configs:
+    - targets: ['docker.for.mac.host.internal:8001']
+
+  - job_name: 'random-temp-fol'
+    static_configs:
+    - targets: ['docker.for.mac.host.internal:8002']
+```
+
+
 ## Iotics host common library
 Version compatibility with Iotics host:
 
