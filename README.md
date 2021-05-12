@@ -191,6 +191,7 @@ The `--network host` flag is not supported on Docker Desktop for Mac.
 Instead you can : -
 * Run prometheus: - `docker run -p 9101:9090 --rm --name prometheus -v"$(realpath ./prometheus.yml)":/prometheus/prometheus.yml prom/prometheus:latest --config.file=/prometheus/prometheus.yml`
 * Run grafana: - `docker run --rm --name grafana -p 3000:3000 grafana/grafana`
+* When configuring the prometheus datasource in grafana set the URL to `http://docker.for.mac.host.internal:9101`
 * Make the prometheus configuration file point to host using `docker.for.mac.host.internal`
 ```yaml
 ...
