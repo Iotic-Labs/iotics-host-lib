@@ -11,11 +11,8 @@ TODO: summary
 In `publisher.py` the example:
 
 ### Creates a twin and sets its basic metadata
-All metadata describing twins is stored using the Resource Description Framework ([RDF](https://www.w3. org/TR/rdf11-concepts/)),
-which makes statements about the world using subject-predicate-object triples. For purposes of this walkthrough, think
-of predicates and objects as keys and values describing the subject (usually a Twin or Feed). Certain basic predicates,
-whose values make the twin accessible via text- or location-based searches, have dedicated parameters in the 
-update_twin method. The use of custom predicates will be shown in the next section.
+The update_twin method has parameters for setting some basic metadata to make the twin accessible via text- and
+location-based searches. Further capabilities for describing twins are shown [below](#adding-more-semantic-metadata-via-custom-properties).
 ```python
 def _create_twin(self) -> str:
     # Create an twin id in the registrar
@@ -51,6 +48,9 @@ Read more about Iotics Cloud in the Iotics documentation: [Getting started with 
 
 
 #### Adding more semantic metadata via custom properties
+All metadata describing twins is stored using the Resource Description Framework ([RDF](https://www.w3.org/TR/rdf11-concepts/)),
+which makes statements about the world using subject-predicate-object triples. For purposes of this walkthrough, think
+of predicates and objects as keys and values describing the subject (usually a Twin or Feed).
 
 In the code snippet below, a custom property is added to the twin while setting the metadata. Custom properties allow
 the user to set the value of the predicate (the `key` parameter), an IRI referencing the definition of the property
