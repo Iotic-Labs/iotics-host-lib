@@ -189,7 +189,7 @@ In the "Explore" view you can use for example the following queries to see Rando
 The `--network host` flag is not supported on Docker Desktop for Mac.
 
 Instead you can : -
-* Run prometheus: - `docker run -p 9092:9090 --rm --name prometheus -v"$(realpath ./prometheus.yml)":/prometheus/prometheus.yml prom/prometheus:latest --config.file=/prometheus/prometheus.yml`
+* Run prometheus: - `docker run -p 9101:9090 --rm --name prometheus -v"$(realpath ./prometheus.yml)":/prometheus/prometheus.yml prom/prometheus:latest --config.file=/prometheus/prometheus.yml`
 * Run grafana: - `docker run --rm --name grafana -p 3000:3000 grafana/grafana`
 * Make the prometheus configuration file point to host using `docker.for.mac.host.internal`
 ```yaml
