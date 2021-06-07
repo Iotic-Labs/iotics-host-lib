@@ -153,29 +153,31 @@ TODO: summary
 
 
 ## Tests and checks - Environment setup
+
 ### Linux
 The basic linux terminal can be used for execution.
 
 ### Windows - Mingw32/Mingw64 setup
-If the user is building the connector on windows, the Mingw terminal should be configured. This terminal will be installed along with Git. To open this terminal use git bash.
+If the user is building the connector on windows, the Mingw terminal needs to be configured. This terminal will be installed along with Git. To open this terminal use git bash.
 
-open git bash and run `make` command
+To check if make is configured in MinGW, open git bash and run `make` command
 ```bash
 make -v
 ```
-If make is not installed/configured, follow the steps to configure make in mingw.
-Download mingw installer from [__mingw-get-setup__](https://sourceforge.net/projects/mingw/)
-Complete the setup and now run the Mingw installer from location you have installed mingw-get-setup (Shortcut should be on desktop by default).
-In the installer select `All packages` in the left pane and then select/mark `mingw32-mingw-get` with class `bin`  `gui` and `lic`. 
-Once marked click on `Installation` tab and select `Apply Changes` and click `Apply` in the dialogue box that pops up. This will install `mingw-get` package which can be used to install make. To apply the package to the git bash mingw terminal copy the content in the target directory of Mingw Installer(usually Folder named `MinGW` in `C:\` drive) to MinGW (MinGw64/32) folder in target folder where Git is installed.
-Once run restart git bash and run following command to install make:
-```bash
-mingw-get install mingw32-make
-```
-This will install make and test the installation by running
-```bash
-make -v
-```
+If make is not installed/configured, follow the steps to configure make in MinGW:
+1. Download mingw installer from [__mingw-get-setup__](https://sourceforge.net/projects/mingw/)
+2. Complete the setup and then run the Mingw installer from location you have installed `mingw-get-setup` (Shortcut should be on desktop by default).
+3. In the installer select `All packages` in the left pane and then select/mark `mingw32-mingw-get` with class `bin`  `gui` and `lic`. 
+4. Once marked click on `Installation` tab and select `Apply Changes` and click `Apply` in the dialogue box that pops up. This will install `mingw-get` package which can be used to install make.
+5. To apply the package to the git bash mingw terminal, copy the content in the target directory of Mingw Installer(usually Folder named `MinGW` in `C:\` drive) to MinGW(MinGw64/32) folder in target folder where Git is installed.
+6.  Once done restart git bash and run following command to install make:
+    ```bash
+    mingw-get install mingw32-make
+    ```
+7.  This will install make and test the installation by running
+    ```bash
+    make -v
+    ```
 
 
 ## Tests and checks

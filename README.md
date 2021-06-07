@@ -38,13 +38,13 @@ with your own data sources.
 
 
 ### Requirements
-Install Cookiecutter, see [__Installation__](https://cookiecutter.readthedocs.io/en/latest/installation.html), e.g.:
-```bash
-pip install cookiecutter
-```
+- For windows users install Python, see  [__Installation__](https://www.python.org/downloads/)
+- Install Cookiecutter, see [__Installation__](https://cookiecutter.readthedocs.io/en/latest/installation.html)
 
 
 ### Create a template of a connector
+>Note: For Windows users in order for cookiecutter to complete the template creation, before running the command remove the `post_gen_project.py` from both follower_template and publisher_template in the `iotics-host-lib/builder/iotics/` directory.
+
 From `iotics-host-lib` root folder run the following command if you want to create a __Publisher__ template:
 ```shell
 cookiecutter builder/iotics/publisher_template/
@@ -215,78 +215,6 @@ scrape_configs:
     static_configs:
     - targets: ['docker.for.mac.host.internal:8002']
 ```
-## Create a new Iotics Connector with Cookiecutter - Windows
-
-
-### Requirements
-Install Python, see  [__Installation__](https://www.python.org/downloads/)
-Install Cookiecutter, see [__Installation__](https://cookiecutter.readthedocs.io/en/latest/installation.html), e.g.:
-```
-pip install cookiecutter
-```
-
-
-### Create a template of a connector
-In order for cookiecutter to complete the template creation, before running the command remove the `post_gen_project.py` from both follower_template and publisher_template in the `iotics-host-lib/builder/iotics/` directory.
-From `iotics-host-lib` root folder run the following command if you want to create a __Publisher__ template:
-```shell
-cookiecutter builder/iotics/publisher_template/
-```
-
-or run the following command if you want to create a __Follower__ template:
-```shell
-cookiecutter builder/iotics/follower_template/
-```
-
-then follow instructions on terminal.
-
-
-### Example of usage
-```shell
-cookiecutter builder/iotics/publisher_template/
-
-project_name [A project name used in the doc (ex: Random Temperature Generator)]: 
-publisher_dir [publisher directory name (ex: random-temp-pub)]: 
-module_name [python module name (ex: randpub)]: 
-command_name [command line name (ex: run-rand-pub)]: 
-conf_env_var_prefix [conf environment variable prefix (ex: RANDPUB_)]: 
-publisher_class_name [publisher class name (ex: RandomTempPublisher)]: 
-Select add_example_code:
-1 - YES
-2 - NO
-Choose from 1, 2 [1]: 
-```
-
-The following structure is created:
-```shell
-├── random-temp-pub
-│   ├── Dockerfile
-│   ├── Makefile
-│   ├── randpub
-│   │   ├── conf.py
-│   │   ├── exceptions.py
-│   │   ├── __init__.py
-│   │   └── publisher.py
-│   ├── README.md
-│   ├── setup.cfg
-│   ├── setup.py
-│   ├── tests
-│   │   └── unit
-│   │       └── randpub
-│   │           ├── conftest.py
-│   │           ├── __init__.py
-│   │           ├── test_conf.py
-│   │           └── test_publisher.py
-│   ├── tox.ini
-│   └── VERSION
-
-4 directories, 15 files
-```
-
-
-### Building and running
-Once you have created a Connector with the Cookiecutter the README.md in that connector's folder will guide you on
-building and running it.
 
 
 ## Iotics host common library
