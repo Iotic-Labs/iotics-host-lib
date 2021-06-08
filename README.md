@@ -34,11 +34,11 @@ Having created a working example using the cookiecutter, you could now obviously
 with your own data sources.
 
 
-## Create a new Iotics Connector with Cookiecutter - Linux
+## Create a new Iotics Connector with Cookiecutter
 
 
 ### Requirements
-- For windows users install Python, see  [__Installation__](https://www.python.org/downloads/)
+- Install Python, see  [__Installation__](https://www.python.org/downloads/)
 - Install Cookiecutter, see [__Installation__](https://cookiecutter.readthedocs.io/en/latest/installation.html)
 
 
