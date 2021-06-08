@@ -2,7 +2,7 @@
 """make_auth: Generates an Agent Auth Token using the environment variables printed by gen_creds.py"""
 
 import os
-
+import sys
 from iotic.lib.identity import Identifier, Authentication
 
 

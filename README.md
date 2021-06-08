@@ -38,13 +38,13 @@ with your own data sources.
 
 
 ### Requirements
-Install Cookiecutter, see [__Installation__](https://cookiecutter.readthedocs.io/en/latest/installation.html), e.g.:
-```bash
-pip install cookiecutter
-```
+- Install Python, see  [__Installation__](https://www.python.org/downloads/)
+- Install Cookiecutter, see [__Installation__](https://cookiecutter.readthedocs.io/en/latest/installation.html)
 
 
 ### Create a template of a connector
+>Note: For Windows users in order for cookiecutter to complete the template creation, before running the command remove the `post_gen_project.py` from both follower_template and publisher_template in the `iotics-host-lib/builder/iotics/` directory.
+
 From `iotics-host-lib` root folder run the following command if you want to create a __Publisher__ template:
 ```shell
 cookiecutter builder/iotics/publisher_template/
