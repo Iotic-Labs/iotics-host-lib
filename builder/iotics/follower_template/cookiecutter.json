@@ -1,5 +1,6 @@
 {
     "_comment": "Do not update this file without updating the hack in the hooks!",
+    "": "Please enter values as prompted (Press Enter without any input for default values/code.) Press Enter now to get started",
     "project_name": "A project name used in the doc (ex: Random Temperature Follower)",
     "follower_dir": "follower directory name (ex: random-temp-fol)",
     "module_name": "python module name (ex: randfol)",
