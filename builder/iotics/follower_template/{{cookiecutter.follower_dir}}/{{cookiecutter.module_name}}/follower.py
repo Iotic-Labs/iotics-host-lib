@@ -150,7 +150,6 @@ def run_follower():
             user_name=conf.auth.user_name, agent_name=conf.auth.agent_name
         )
         qapi_factory = QApiFactory(conf, agent_auth, client_app_id=f'{{cookiecutter.module_name}}_{uuid4()}')
-
 {% if cookiecutter.add_example_code == "NO" %}
         # TODO: update the follower instantiation
         follower = {{cookiecutter.follower_class_name}}(agent_auth, qapi_factory){% else %}

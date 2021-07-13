@@ -11,7 +11,10 @@ from {{cookiecutter.module_name}}.conf import {{cookiecutter.follower_class_name
 def min_conf_data():
     # TODO: update with follower specific mandatory conf
     return {
-        'auth': {'seed': 'a seed', 'user': 'did:iotics:USERKEY', 'resolver_host': 'http:plop:5000'}
+        'auth': {
+            'user_seed': 'a user seed', 'agent_seed': 'an agent seed',
+            'resolver_host': 'http:plop:5000'
+        }
     }
 
 
@@ -36,8 +39,8 @@ def write_yaml_conf_file(work_dir, conf_data):
 def test_should_load_minimal_conf_with_default_values(work_dir, min_conf_data):
     conf_file_path = write_yaml_conf_file(work_dir, min_conf_data)
     conf = {{cookiecutter.follower_class_name}}Conf.get_conf(conf_file_path)
-    assert conf.auth.seed == min_conf_data['auth']['seed']
-    assert conf.auth.user == min_conf_data['auth']['user']
+    assert conf.auth.user_seed == min_conf_data['auth']['user_seed']
+    assert conf.auth.agent_seed == min_conf_data['auth']['agent_seed']
     assert conf.auth.resolver_host == min_conf_data['auth']['resolver_host']
     assert conf.qapi_url == 'http://localhost:8081/qapi'
     assert conf.root_log_level is None
@@ -48,15 +51,15 @@ def test_should_load_conf_with_full_values(work_dir, full_conf_data):
     conf_file_path = write_yaml_conf_file(work_dir, full_conf_data)
     conf = {{cookiecutter.follower_class_name}}Conf.get_conf(conf_file_path)
     assert conf.qapi_url == full_conf_data['qapi_url']
-    assert conf.auth.seed == full_conf_data['auth']['seed']
-    assert conf.auth.user == full_conf_data['auth']['user']
+    assert conf.auth.user_seed == full_conf_data['auth']['user_seed']
+    assert conf.auth.agent_seed == full_conf_data['auth']['agent_seed']
     assert conf.auth.resolver_host == full_conf_data['auth']['resolver_host']
     assert conf.root_log_level == full_conf_data['root_log_level']
     # TODO: add checks on values for follower specific conf
 
 
 # TODO: update with all the mandatory values
-@pytest.mark.parametrize('missing_conf', ('seed', 'user'))
+@pytest.mark.parametrize('missing_conf', ('user_seed', 'agent_seed'))
 def test_should_raise_if_missing_mandatory_value_from_base_conf(work_dir, min_conf_data, missing_conf):
     min_conf_data['auth'].pop(missing_conf)
     conf_file_path = write_yaml_conf_file(work_dir, min_conf_data)
