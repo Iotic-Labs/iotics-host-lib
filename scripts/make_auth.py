@@ -3,35 +3,40 @@
 
 import os
 import sys
-from iotic.lib.identity import Identifier, Authentication
+
+from iotics.lib.identity.api.high_level_api import get_rest_high_level_identity_api
 
 
 def main():
-    if not os.environ.get('RESOLVER_HOST'):
-        print('Error: RESOLVER_HOST environment must be set')
+
+    resolver = os.environ.get('RESOLVER_HOST')
+
+    user_key_name = os.environ.get('USER_KEY_NAME')
+    user_seed = os.environ.get('USER_SEED')
+
+    agent_key_name = os.environ.get('AGENT_KEY_NAME')
+    agent_seed = os.environ.get('AGENT_SEED')
+
+    if not all([resolver, user_key_name, user_seed, agent_key_name, agent_seed]):
+        print('Error: RESOLVER_HOST, USER_KEY_NAME, USER_SEED and AGENT_KEY_NAME must all be set')
         sys.exit(1)
 
-    audience = os.environ.get('RESOLVER_HOST', 'audience')
-    user_id = os.environ.get('HOST_USER')
-    agent_seed = os.environ.get('SEED')
-    if not user_id or not agent_seed:
-        print('Error: Must set HOST_USER and SEED environment variables from gen_creds.py')
+    api = get_rest_high_level_identity_api(resolver)
 
-    master = Identifier.seed_to_master(agent_seed)
-    private_key_hex = Identifier.new_private_hex_from_path(master, Identifier.DIDType.AGENT, count=0)
-    private_key_ecdsa = Identifier.private_hex_to_ECDSA(private_key_hex)
+    user_registered_id, agent_registered_id = api.create_user_and_agent_with_auth_delegation(
+        user_seed=bytes.fromhex(user_seed), user_key_name=user_key_name,
+        agent_seed=bytes.fromhex(agent_seed), agent_key_name=agent_key_name,
+        delegation_name='#AuthDeleg'
+    )
 
-    public_key_ecdsa = Identifier.private_ECDSA_to_public_ECDSA(private_key_ecdsa)
-    public_key_hex = Identifier.public_ECDSA_to_bytes(public_key_ecdsa).hex()
-    issuer = Identifier.make_identifier(public_key_hex) + '#agent-0'
+    # -- Create token -------------------------------------------------------------------------------------------------- #
 
-    print(f'---\nNew Authentication Token for Agent: {issuer}\n')
+    print(f'---\nNew Authentication Token for Agent: {agent_registered_id.did}\n')
 
-    print(Authentication.new_authentication_token(issuer,
-                                                  user_id,
-                                                  audience,
-                                                  60 * 60 * 8,         # 8hr duration
-                                                  private_key_ecdsa).decode())
+    print(api.create_agent_auth_token(
+        agent_registered_identity=agent_registered_id,
+        user_did=user_registered_id.did, duration=3600
+    ))
 
 
 if __name__ == '__main__':

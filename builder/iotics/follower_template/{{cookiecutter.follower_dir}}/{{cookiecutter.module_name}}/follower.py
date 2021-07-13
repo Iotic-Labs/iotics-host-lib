@@ -53,7 +53,7 @@ class {{cookiecutter.follower_class_name}}:
         self.follower_twin_id = None
 
     def create_follower_twin(self):
-        twin_id, _, _ = self.agent_auth.make_twin_id('{{cookiecutter.follower_class_name}}')
+        twin_id = self.agent_auth.make_twin_id('{{cookiecutter.follower_class_name}}')
         self.twin_api.create_twin(twin_id)
         self.follower_twin_id = twin_id
 
@@ -144,8 +144,13 @@ def run_follower():
         logging.basicConfig(
             format={{"'%(asctime)s %(levelname)s [%(name)s] {%(threadName)s} %(message)s'"}}, level=conf.root_log_level
         )
-        agent_auth = AgentAuthBuilder.build_agent_auth(conf.auth.resolver_host, conf.auth.seed, conf.auth.user)
+        agent_auth = AgentAuthBuilder.build_agent_auth(
+            resolver_url=conf.auth.resolver_host, user_seed=conf.auth.user_seed, user_key_name=conf.auth.user_key_name,
+            agent_seed=conf.auth.agent_seed, agent_key_name=conf.auth.agent_key_name,
+            user_name=conf.auth.user_name, agent_name=conf.auth.agent_name
+        )
         qapi_factory = QApiFactory(conf, agent_auth, client_app_id=f'{{cookiecutter.module_name}}_{uuid4()}')
+
 {% if cookiecutter.add_example_code == "NO" %}
         # TODO: update the follower instantiation
         follower = {{cookiecutter.follower_class_name}}(agent_auth, qapi_factory){% else %}

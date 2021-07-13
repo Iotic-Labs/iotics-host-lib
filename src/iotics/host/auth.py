@@ -1,142 +1,89 @@
-import os
 import re
-from collections import namedtuple
-from typing import Optional
 
-from iotic.lib.identity import Authentication, Document, Identifier, Resolver
-from iotic.lib.identity.document import DIDDocument, RESOLVER_ENV
-from iotic.lib.identity.exceptions import IdentityNotFound, ResolverError
+from iotics.lib.identity.api.high_level_api import get_rest_high_level_identity_api,\
+    RegisteredIdentity, HighLevelIdentityApi
+from iotics.lib.identity.error import IdentityResolverCommunicationError
 
 from iotics.host.exceptions import DataSourcesAuthException
 
-Agent = namedtuple('Agent', ('id', 'pk', 'doc'))
-
 
 class AgentAuth:
-    """AgentAuth: A very basic auth helper for an agent & twins
+    def __init__(
+        self, api: HighLevelIdentityApi, user_did: RegisteredIdentity,
+        agent_did: RegisteredIdentity, agent_seed: str
+    ):
+        self._api = api
+        self._user_did = user_did
+        self._agent_did = agent_did
+        self._agent_seed = agent_seed
 
-    Caveats:
-    - Twins should be made using a path on the Agent seed (not their own seed)
-    - Agent & Twins will use the first public key (eg keys not rotated)
-    """
-
-    # DEFAULT_DELEG_NAME Used when delegating twin -> agent.
-    DEFAULT_DELEG_NAME = '#agent'
-
-    def __init__(self, agent: Agent, master: bytes, user_deleg: str, user_id: str, audience: str):
-        self.audience = audience
-        self.user_id = user_id
-        self.master = master
-        self.agent = agent
-        self.user_deleg = user_deleg
-
-    def make_agent_auth_token(self, audience: str = 'test-audience', duration: int = 600) -> str:
+    def make_agent_auth_token(self, duration: int = 600) -> str:
         """make_agent_auth_token:
-        audience = address or ID (not enforced by iotic-web/rest currently)
         duration = int seconds
         """
-        # future to do: might not be public_keys[0] ?
-        issuer = self.agent.doc.id + self.agent.doc.public_keys[0].id
-
-        tkn = Authentication.new_authentication_token(
-            issuer,                     # Issuer is Agent
-            self.user_id,               # Subject is User we're authenticating as
-            audience,                   # Audience is the id/address/url we're authenticating to
-            duration,                   # Duration seconds
-            self.agent.pk
+        return self._api.create_agent_auth_token(
+            agent_registered_identity=self._agent_did,
+            user_did=self._user_did.did,
+            duration=duration
         )
-        return tkn.decode('ascii')
 
-    def make_twin_id(self, lid: str, agent_deleg: bool = True) -> tuple:
+    def make_twin_id(self, twin_key_name: str) -> str:
         """make_twin_id: Make and register a twin identity.  Return identifier.
-        lid = twin local id
-        agent_deleg = Optional True/False to delegate to (this) Agent
+        twin_key_name = along with a seed forms the DID
 
-        Returns did, private_key_ecdsa, doc
+        Returns RegisteredIdentity
         """
-        pk_hex = Identifier.new_private_hex_from_path_str(self.master, Identifier.DIDType.TWIN, lid)
-        prk = Identifier.private_hex_to_ECDSA(pk_hex)
-        doc = Document.new_did_document(Identifier.DIDType.TWIN, prk)
 
-        if not discover_identity(doc.id):
-            if agent_deleg:
-                proof = Document.new_proof(doc.id.encode('ascii'), self.agent.pk)
-                deleg = Document.new_delegation(self.DEFAULT_DELEG_NAME,
-                                                self.agent.id + self.agent.doc.public_keys[0].id,
-                                                proof)
-                doc.add_control_delegation(deleg)
+        twin_did = self._api.create_twin_with_control_delegation(
+            twin_seed=bytes.fromhex(self._agent_seed),
+            twin_key_name=twin_key_name,
+            agent_registered_identity=self._agent_did,
+            delegation_name='#ControlDeleg', override_doc=True
+        )
 
-            tkn = Document.new_document_token(doc, self.audience, doc.id + doc.public_keys[0].id, prk)
-            Resolver.register(tkn)
-
-        return doc.id, prk, doc
-
-
-def discover_identity(did) -> Optional[DIDDocument]:
-    """Fetch and return DDO or None"""
-    try:
-        return Resolver.discover(did)
-    except IdentityNotFound:
-        return None
-    except ResolverError as err:
-        raise DataSourcesAuthException(err) from err
+        return twin_did.did
 
 
 class AgentAuthBuilder:
-    @staticmethod
-    def _get_agent_id_from_private_key(master: bytes, keynum: int = 0):
-        pk_hex = Identifier.new_private_hex_from_path(master, Identifier.DIDType.AGENT, keynum)
-        prk = Identifier.private_hex_to_ECDSA(pk_hex)
-        puk = Identifier.private_ECDSA_to_public_ECDSA(prk)
-        puk_hex = Identifier.public_ECDSA_to_bytes(puk).hex()
-        agent_id = Identifier.make_identifier(puk_hex)
-        return agent_id, prk
 
     @staticmethod
-    def _get_user_deleg(user_id: str, agent_id: str):
-        """Check the agent is allowed to work on user's behalf
+    def build_agent_auth(
+        resolver_url: str, user_seed: str, user_key_name: str,
+        agent_seed: str, agent_key_name: str,
+        user_name: str = None, agent_name: str = None
+    ) -> AgentAuth:
+        """creates the class that can generate api tokens and twin dids for this agent
 
-        Returns the name of the delegation used for user -> agent
+        Args:
+            resolver_url (str): address of resolver
+            user_seed (str): user seed
+            user_key_name (str): along with the user seed this is used to generate
+                the user DID can be any string any length as it is hashed
+            agent_seed (str): agent seed
+            agent_key_name (str): along with the agent seed this is used to generate
+                the user DID can be any string any length as it is hashed
+            user_name (str): optional friendly name that is stored in the DID document
+            agent_name (str): optional friendly name that is stored in the DID document
+
+        Returns:
+            AgentAuth: class that can generate api tokens and twin dids for this agent
         """
-        user_doc = discover_identity(user_id)
-        if user_doc is None:
-            raise DataSourcesAuthException(f'User ID {user_id} does not exist')
 
-        for k in user_doc.delegate_control + user_doc.delegate_authentication:
-            if Identifier.compare_identifier_only(agent_id, k.controller):
-                return k.id
+        if (
+            re.match(r'^[0-9a-fA-F]{32,64}$', user_seed) is None
+            or re.match(r'^[0-9a-fA-F]{32,64}$', agent_seed) is None
+        ):
+            raise DataSourcesAuthException('Seeds must be hex string 32-64 chars')
 
-        raise DataSourcesAuthException(f'User ID {user_id} has not allowed Agent {agent_id}')
+        api = get_rest_high_level_identity_api(resolver_url)
 
-    @staticmethod
-    def _get_agent(master: bytes, keynum: int = 0) -> Agent:
-        agent_id, prk = AgentAuthBuilder._get_agent_id_from_private_key(master, keynum)
-        agent_doc = discover_identity(agent_id)
-        if not agent_doc:
-            raise DataSourcesAuthException(f'Agent ID {agent_id} does not exist')
-
-        return Agent(agent_id, prk, agent_doc)
-
-    @staticmethod
-    def build_agent_auth(host: str,
-                         seed: str,
-                         user_id: str,
-                         password: bytes = b'',
-                         method: int = Identifier.SeedMethod.SEED_METHOD_BIP39,
-                         keynum: int = 0) -> AgentAuth:
-        """
-        seed = hex string
-        user_id = DID of user this agent is working on behalf of
-        password = optional bytes
-        """
-        os.environ[RESOLVER_ENV] = host
-        if re.match(r'^[0-9a-fA-F]{32,64}$', seed) is None:
-            raise DataSourcesAuthException('Seed must be hex string 32-64 chars')
         try:
-            Identifier.validate_identifier(user_id)
-        except ValueError as err:
+            user_did, agent_did = api.create_user_and_agent_with_auth_delegation(
+                user_seed=bytes.fromhex(user_seed), user_key_name=user_key_name, user_name=user_name,
+                agent_seed=bytes.fromhex(agent_seed), agent_key_name=agent_key_name, agent_name=agent_name,
+                delegation_name='#AuthDeleg'
+            )
+        except IdentityResolverCommunicationError as err:
             raise DataSourcesAuthException(err) from err
-        master = Identifier.seed_to_master(seed, password, method)
-        agent = AgentAuthBuilder._get_agent(master, keynum)
-        user_deleg = AgentAuthBuilder._get_user_deleg(user_id, agent.id)
-        return AgentAuth(agent, master, user_deleg, user_id, audience=host)
+
+        return AgentAuth(api, user_did, agent_did, agent_seed)

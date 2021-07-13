@@ -13,7 +13,7 @@ In `follower.py` the example:
 ### Creates a twin representing the follower
 ```python
     def create_follower_twin(self):
-        twin_id, _, _ = self.agent_auth.make_twin_id('{{cookiecutter.follower_class_name}}')
+        twin_id = self.agent_auth.make_twin_id('{{cookiecutter.follower_class_name}}')
         self.twin_api.create_twin(twin_id)
         self.follower_twin_id = twin_id
 ```
@@ -49,6 +49,45 @@ def follow_twins(self):
                 )
 ```
 
+### Logs the received data
+As data is base64-encoded before being shared, it must be decoded before use.
+```python
+def follow_callback(header, body):  # pylint: disable=W0613
+    decoded_data = base64.b64decode(body.payload.feed_data.data).decode('ascii')
+    temperature = json.loads(decoded_data)
+    timestamp = body.payload.feed_data.occurred_at.isoformat()
+
+    logger.info('Received temperature data %s at time %s', temperature, timestamp)
+```
+
+### Repeatedly searches to find and follow new twins
+```python
+def run(self):
+    logger.info('Follower started')
+    self.create_follower_twin()
+
+    while True:
+        self.follow_twins()
+        logger.info('Sleeping for %s seconds', self.loop_time)
+        sleep(self.loop_time)
+```
+
+### Get feed's most recent data via the InterestApi
+A feed's most recent data is available via the InterestApi if the followed feed has the tag `store_last` set to `True`
+(cf. publisher example)
+```python
+def get_most_recent_data(self, followed_twin_id: str, feed_id: str):
+    """ Get feed's most recent data via the InterestApi
+        Note: the feed metadata must include store_last=True
+    """
+    logger.info('Get most recent data via InterestApi')
+    most_recent_data = self.interest_api.get_feed_last_stored(follower_twin_id=self.follower_twin_id,
+                                                              followed_twin_id=followed_twin_id,
+                                                              feed_id=feed_id)
+    decoded_data = base64.b64decode(most_recent_data.feed_data.data).decode()
+    temperature = json.loads(decoded_data)
+    logger.info('Most recent data %s', temperature)
+```
 
 ### Semantic based searches for and follows twins
 The generated example searches for twins using a text based search, but you can also search using custom semantic
@@ -94,46 +133,6 @@ def follow_twins(self):
                     logger.info('Subscribed to feed %s on twin %s', feed_id, twin_id)
 
     logger.info('Found %s twins; subscribed to %s new feeds.', found_twins, subscription_count)
-```
-
-### Logs the received data
-As data is base64-encoded before being shared, it must be decoded before use.
-```python
-def follow_callback(header, body):  # pylint: disable=W0613
-    decoded_data = base64.b64decode(body.payload.feed_data.data).decode('ascii')
-    temperature = json.loads(decoded_data)
-    timestamp = body.payload.feed_data.occurred_at.isoformat()
-
-    logger.info('Received temperature data %s at time %s', temperature, timestamp)
-```
-
-### Repeatedly searches to find and follow new twins
-```python
-def run(self):
-    logger.info('Follower started')
-    self.create_follower_twin()
-
-    while True:
-        self.follow_twins()
-        logger.info('Sleeping for %s seconds', self.loop_time)
-        sleep(self.loop_time)
-```
-
-### Get feed's most recent data via the InterestApi
-A feed's most recent data is available via the InterestApi if the followed feed has the tag `store_last` set to `True`
-(cf. publisher example)
-```python
-def get_most_recent_data(self, followed_twin_id: str, feed_id: str):
-    """ Get feed's most recent data via the InterestApi
-        Note: the feed metadata must include store_last=True
-    """
-    logger.info('Get most recent data via InterestApi')
-    most_recent_data = self.interest_api.get_feed_last_stored(follower_twin_id=self.follower_twin_id,
-                                                              followed_twin_id=followed_twin_id,
-                                                              feed_id=feed_id)
-    decoded_data = base64.b64decode(most_recent_data.feed_data.data).decode()
-    temperature = json.loads(decoded_data)
-    logger.info('Most recent data %s', temperature)
 ```
 
 In `conf.py`:
@@ -216,15 +215,17 @@ More info about DIDs can be found on [docs.iotics.com](docs.iotics.com).
 python3 -mvenv venv
 source venv/bin/activate
 pip install -U pip setuptools
-pip install -f deps iotic.lib.identity
-# or use an existing one and then call:
-./scripts/gen_creds.py
+pip install iotics-identity
+# or use an existing environment and then call:
+./scripts/gen_creds.py --resolver [resolver url e.g. https://your.resolver]
 ```
 Once the script successfully completes, take a note of variables for your component:
 ```bash
 export RESOLVER_HOST=https://your.resolver
-export HOST_USER=did:iotics:iot1234567890aBcDeFgHiJkLmNoPQrStUvW
-export SEED=000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+export USER_SEED=dec8615d1fc1598ceade592a6d756cad3846d8a2fc9a26af7251df7eb152b771
+export USER_KEY_NAME=00
+export AGENT_SEED=000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+export AGENT_KEY_NAME=00
 ```
 Those should be kept safe and be present in the environment in which you are running your connector.
 If you are using the same user for a publisher component and a follower component, you can reuse the same
@@ -237,11 +238,13 @@ The environment variables can be set either by updating the values within the ma
 ```bash
 cd ./{{cookiecutter.follower_dir}}
 # then export some environment variables
-export SEED=[agent seed from above e.g. lmnop5678...]
-export HOST_USER=[user did e.g. did:iotics:xyz54321...]
-export QAPI_URL=[address of qapi]
-export QAPI_STOMP_URL=[address of qapi]
 export RESOLVER_HOST=[address of resolver for your space]
+export USER_SEED=[user seed from above e.g. lmnop5678...]
+export USER_KEY_NAME=[user seed from above e.g. 00]
+export AGENT_SEED=[agent seed from above e.g. lmnop5678...]
+export AGENT_KEY_NAME=[user seed from above e.g. 00]
+export QAPI_URL=[address of qapi]
+export QAPI_STOMP_URL=[address of qapi stomp endpoint]
 
 # next either
 make docker-run # Run using the docker image

@@ -8,8 +8,14 @@ from iotics.host.exceptions import DataSourcesConfigurationError
 
 
 class AuthConf(BaseModel):
-    seed: str
-    user: str
+    user_seed: str
+    user_key_name: str = '#user-0'
+    user_name: str = '#user-0'
+
+    agent_seed: str
+    agent_key_name: str = '#agent-0'
+    agent_name: str = '#agent-0'
+
     resolver_host: str
 
 

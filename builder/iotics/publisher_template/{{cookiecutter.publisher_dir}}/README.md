@@ -16,7 +16,7 @@ location-based searches. Further capabilities for describing twins are shown [be
 ```python
 def _create_twin(self) -> str:
     # Create an twin id in the registrar
-    twin_id, _, _ = self.agent_auth.make_twin_id(TWIN_NAME)
+    twin_id = self.agent_auth.make_twin_id(TWIN_NAME)
 
     # Create the twin
     self.twin_api.create_twin(twin_id)
@@ -45,34 +45,6 @@ def _set_twin_meta(self, twin_id: str):
 In the code snippet above, the London location is added to the twin metadata.
 This will make the twin visible in Iotics Cloud.
 Read more about Iotics Cloud in the Iotics documentation: [Getting started with Iotics Cloud](https://docs.iotics.com/docs/getting-started-with-iotics-cloud)
-
-
-#### Adding more semantic metadata via custom properties
-All metadata describing twins is stored using the Resource Description Framework ([RDF](https://www.w3.org/TR/rdf11-concepts/)),
-which makes statements about the world using subject-predicate-object triples. For purposes of this walkthrough, think
-of predicates and objects as keys and values describing the subject (usually a Twin or Feed).
-
-In the code snippet below, a custom property is added to the twin while setting the metadata. Custom properties allow
-the user to set the value of the predicate (the `key` parameter), an IRI referencing the definition of the property
-(ie, what sort of thing it describes and how). The object is set using a second parameter, either one of various
-`literal` types or a `uri` -- see the ModelProperty source code.
-
-Twins so decorated may be found in a semantic search based on a set of properties. You can see the follower doing this
-type of search in its `Semantic searches for and follows twins` section.
-Read more about properties in the Iotics documentation:
-- [What is an IOTICS Digital Twin?](https://docs.iotics.com/docs/key-concepts#what-is-an-iotics-digital-twin)
-- [Properties](https://docs.iotics.com/docs/setting-up-a-digital-twin#properties)
-
-```python
-def _set_twin_meta(self, twin_id: str):
-    category_property = ModelProperty(key='http://data.iotics.com/ns/category',
-                                      uri_value=Uri(value='http://data.iotics.com/category/Temperature'))
-
-    self.twin_api.update_twin(
-        twin_id,
-        add_props=[category_property]
-    )
-```
 
 ### Creates a feed and sets its metadata
 Feeds are described using many of the same properties as twins, (eg labels and comments), as shown above. Additionally,
@@ -130,6 +102,35 @@ def _share_feed_data(self, twin_id: str, feed_name: str):
 
     return non_encoded_data
 ```
+
+
+#### Adding more semantic metadata via custom properties
+All metadata describing twins is stored using the Resource Description Framework ([RDF](https://www.w3.org/TR/rdf11-concepts/)),
+which makes statements about the world using subject-predicate-object triples. For purposes of this walkthrough, think
+of predicates and objects as keys and values describing the subject (usually a Twin or Feed).
+
+In the code snippet below, a custom property is added to the twin while setting the metadata. Custom properties allow
+the user to set the value of the predicate (the `key` parameter), an IRI referencing the definition of the property
+(ie, what sort of thing it describes and how). The object is set using a second parameter, either one of various
+`literal` types or a `uri` -- see the ModelProperty source code.
+
+Twins so decorated may be found in a semantic search based on a set of properties. You can see the follower doing this
+type of search in its `Semantic searches for and follows twins` section.
+Read more about properties in the Iotics documentation:
+- [What is an IOTICS Digital Twin?](https://docs.iotics.com/docs/key-concepts#what-is-an-iotics-digital-twin)
+- [Properties](https://docs.iotics.com/docs/setting-up-a-digital-twin#properties)
+
+```python
+def _set_twin_meta(self, twin_id: str):
+    category_property = ModelProperty(key='http://data.iotics.com/ns/category',
+                                      uri_value=Uri(value='http://data.iotics.com/category/Temperature'))
+
+    self.twin_api.update_twin(
+        twin_id,
+        add_props=[category_property]
+    )
+```
+
 
 In `conf.py`:
 
@@ -199,9 +200,8 @@ Set the resolver host
 export RESOLVER_HOST=https://your.resolver
 ```
 Run `gen_creds.py` script from the `iotics-host-lib` directory to generate:
-- **USER SEED** used to generate and retrieve your user DID,
-- **USER DID** required by all your connectors to run and connect to Iotics host,
-- **AGENT SEED** a unique seed required for each of your connector.
+- **USER_SEED** and **USER_KEY_NAME** together used to generate your agent DID
+- **AGENT_SEED** and **AGENT_KEY_NAME** together used to generate your agent DID
 
 More info about DIDs can be found on [docs.iotics.com](docs.iotics.com).
 
@@ -210,20 +210,22 @@ More info about DIDs can be found on [docs.iotics.com](docs.iotics.com).
 python3 -mvenv venv
 source venv/bin/activate
 pip install -U pip setuptools
-pip install -f deps iotic.lib.identity
-# or use an existing one and then call:
-./scripts/gen_creds.py
+pip install iotics-identity
+# or use an existing environment and then call:
+./scripts/gen_creds.py --resolver [resolver url e.g. https://your.resolver]
 ```
 Once the script successfully completes, take a note of variables for your component:
 ```bash
 export RESOLVER_HOST=https://your.resolver
-export HOST_USER=did:iotics:iot1234567890aBcDeFgHiJkLmNoPQrStUvW
-export SEED=000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+export USER_SEED=dec8615d1fc1598ceade592a6d756cad3846d8a2fc9a26af7251df7eb152b771
+export USER_KEY_NAME=00
+export AGENT_SEED=000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+export AGENT_KEY_NAME=00
 ```
 Those should be kept safe and be present in the environment in which you are running your connector.
 If you are using the same user for a publisher component and a follower component, you can reuse the same
 USER SEED, but **note that this should NOT be stored in production environment with your component,
-instead keep it safe and secure elsewhere**. The seed can be stored and recognised by the `gen_creds.py`.
+instead keep it safe and secure elsewhere**.
 
 
 ### Run component
@@ -231,10 +233,12 @@ The environment variables can be set either by updating the values within the ma
 ```bash
 cd ./{{cookiecutter.publisher_dir}}
 # then export some environment variables
-export SEED=[agent seed from above e.g. lmnop5678...]
-export HOST_USER=[user did e.g. did:iotics:xyz54321...]
-export QAPI_URL=[address of qapi]
 export RESOLVER_HOST=[address of resolver for your space]
+export USER_SEED=[user seed from above e.g. lmnop5678...]
+export USER_KEY_NAME=[user seed from above e.g. 00]
+export AGENT_SEED=[agent seed from above e.g. lmnop5678...]
+export AGENT_KEY_NAME=[user seed from above e.g. 00]
+export QAPI_URL=[address of qapi]
 
 # next either
 make docker-run # Run using the docker image
