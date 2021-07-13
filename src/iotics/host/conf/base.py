@@ -9,11 +9,11 @@ from iotics.host.exceptions import DataSourcesConfigurationError
 
 class AuthConf(BaseModel):
     user_seed: str
-    user_key_name: str = '#user-0'
+    user_key_name: str = '00'
     user_name: str = '#user-0'
 
     agent_seed: str
-    agent_key_name: str = '#agent-0'
+    agent_key_name: str = '00'
     agent_name: str = '#agent-0'
 
     resolver_host: str
