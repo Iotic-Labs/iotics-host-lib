@@ -1,6 +1,6 @@
 {
     "_comment": "Do not update this file without updating the hack in the hooks!",
-    "": "Please enter values as prompted (Press Enter without any input for default values/code.) Press Enter now to get started",
+    "Please enter values as prompted or press Enter without any input for default values.\n": "Press Enter now to get started",
     "project_name": "A project name used in the doc (ex: Random Temperature Generator)",
     "publisher_dir": "publisher directory name (ex: random-temp-pub)",
     "module_name": "python module name (ex: randpub)",
