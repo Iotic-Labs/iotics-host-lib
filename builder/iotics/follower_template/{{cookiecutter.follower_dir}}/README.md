@@ -84,6 +84,10 @@ def get_most_recent_data(self, followed_twin_id: str, feed_id: str):
     most_recent_data = self.interest_api.get_feed_last_stored(follower_twin_id=self.follower_twin_id,
                                                               followed_twin_id=followed_twin_id,
                                                               feed_id=feed_id)
+    if not most_recent_data.feed_data:
+        logger.info('No most recent data found.')
+        return
+
     decoded_data = base64.b64decode(most_recent_data.feed_data.data).decode()
     temperature = json.loads(decoded_data)
     logger.info('Most recent data %s', temperature)
@@ -204,9 +208,8 @@ Set the resolver host
 export RESOLVER_HOST=https://your.resolver
 ```
 Run `gen_creds.py` script from the `iotics-host-lib` directory to generate:
-- **USER SEED** used to generate and retrieve your user DID,
-- **USER DID** required by all your connectors to run and connect to Iotics host,
-- **AGENT SEED** a unique seed required for each of your connector.
+- **USER_SEED** and **USER_KEY_NAME** together used to generate your agent DID
+- **AGENT_SEED** and **AGENT_KEY_NAME** together used to generate your agent DID
 
 More info about DIDs can be found on [docs.iotics.com](docs.iotics.com).
 

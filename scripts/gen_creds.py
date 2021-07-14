@@ -23,10 +23,10 @@ def parse_args():
 
     parser.add_argument('--resolver', help='Resolver address e.g. `https://did.prd.iotics.com`', default='http://localhost:5000')
     parser.add_argument(
-        '--user_key_name', help='Along with the user seed forms part of the user''s DID', default='00'
+        '--user_key_name', help='Along with the user seed forms part of the user\'s DID', default='00'
     )
     parser.add_argument(
-        '--agent_key_name', help='Along with the agent seed forms part of the agent''s DID', default='00'
+        '--agent_key_name', help='Along with the agent seed forms part of the agent\'s DID', default='00'
     )
 
     return parser.parse_args()
@@ -53,7 +53,7 @@ def main():
   
 
 class CredentialsGenerator:
-    seed_cache_file = 'user_key_names.txt'
+    seed_cache_file = 'user_secrets.txt'
 
     def __init__(self, resolver):
         self.resolver_address = resolver
@@ -67,7 +67,7 @@ class CredentialsGenerator:
         """Creates a random or finds an existing user seed
 
         Returns:
-            tuple: A seed and key_name nad True if it was created or False otherwise.
+            tuple: A seed, key_name and True if it was created or False otherwise.
         """
         if not self.seed_cache.is_file():
             self.continue_prompt('Creating a new user seed')
@@ -76,10 +76,10 @@ class CredentialsGenerator:
             return seed, user_key_name, True
 
         with self.seed_cache.open() as f:
-            user_key_names = f.readline()
+            user_secrets = f.readline()
         print(f'Found a user seed in `{self.seed_cache.absolute()}`.')
 
-        parts = user_key_names.split(',')
+        parts = user_secrets.split(',')
         assert len(parts) == 2, 'expecting there to be 2 comma separated values in the seed file; seed,user_key_name'
         saved_seed = parts[0]
         saved_key_name = parts[1]

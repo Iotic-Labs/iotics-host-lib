@@ -42,7 +42,7 @@ AGENT_KEY_NAME ?= "00"  # along with seed used to create DID
 QAPI_URL ?= http://localhost:8081/qapi
 RESOLVER_HOST ?= http://localhost:5000
 VERIFY_SSL ?= False
-LOG_LEVEL ?= DEBUG
+LOG_LEVEL ?= INFO
 
 docker-run: docker-build  ## Docker run of the publisher against a running host (see README)
 	$Q docker run --rm --network host \

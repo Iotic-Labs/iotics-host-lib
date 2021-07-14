@@ -1,7 +1,9 @@
 import re
 
-from iotics.lib.identity.api.high_level_api import get_rest_high_level_identity_api,\
+from iotics.lib.identity.api.high_level_api import (
+    get_rest_high_level_identity_api,
     RegisteredIdentity, HighLevelIdentityApi
+)
 from iotics.lib.identity.error import IdentityResolverCommunicationError
 
 from iotics.host.exceptions import DataSourcesAuthException
@@ -27,18 +29,19 @@ class AgentAuth:
             duration=duration
         )
 
-    def make_twin_id(self, twin_key_name: str) -> str:
+    def make_twin_id(self, twin_key_name: str, override_doc: bool = False) -> str:
         """make_twin_id: Make and register a twin identity.  Return identifier.
         twin_key_name = along with a seed forms the DID
+        override_doc = override registered identity document if already exist (default False)
 
-        Returns RegisteredIdentity
+        Returns DID string
         """
 
         twin_did = self._api.create_twin_with_control_delegation(
             twin_seed=bytes.fromhex(self._agent_seed),
             twin_key_name=twin_key_name,
             agent_registered_identity=self._agent_did,
-            delegation_name='#ControlDeleg', override_doc=True
+            delegation_name='#ControlDeleg', override_doc=override_doc
         )
 
         return twin_did.did

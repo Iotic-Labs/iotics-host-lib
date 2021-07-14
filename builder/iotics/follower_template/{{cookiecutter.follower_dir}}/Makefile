@@ -43,7 +43,7 @@ QAPI_URL ?= http://localhost:8081/qapi
 QAPI_STOMP_URL ?= ws://localhost:8080/ws
 RESOLVER_HOST ?= http://localhost:5000
 VERIFY_SSL ?= False
-LOG_LEVEL ?= DEBUG
+LOG_LEVEL ?= INFO
 
 docker-run: docker-build  ## Docker run of the follower against a running host (see README)
 	$Q docker run --rm --network host \

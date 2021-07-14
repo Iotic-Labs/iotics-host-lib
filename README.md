@@ -217,6 +217,11 @@ scrape_configs:
 ```
 
 
+## Testing FAQ
+
+* When running `make unit-tests` in the top level of this repo you can get the error `AssertionError: assert 'Max retries exceeded with' in ''` if you are running the iotics host locally. The solution is to run `make docker-clean-test` on the local host and the tests should all pass.
+
+
 ## Iotics host common library
 Version compatibility with Iotics host:
 
