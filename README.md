@@ -57,6 +57,8 @@ cookiecutter builder/iotics/follower_template/
 
 then follow instructions on terminal.
 
+>Note: To generate the default example with sample code, press the `Enter` key for all options without providing any input.
+
 
 ### Example of usage
 ```bash
