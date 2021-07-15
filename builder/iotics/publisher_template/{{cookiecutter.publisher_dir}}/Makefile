@@ -32,26 +32,40 @@ docker-build: ## Build the container
 	   && docker build --build-arg VERSION=$(VERSION) -t $(APP_NAME) -f {{cookiecutter.publisher_dir}}/Dockerfile .
 
 
-SEED ?= "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-HOST_USER ?= "did:iotics:iotVm7Afr6bs4PdTyw6yDvT3eF9L2THTV1iM"
+USER_SEED ?= "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+USER_KEY_NAME ?= "00"  # along with seed used to create DID
+# USER_NAME  # stored in did document, if unset default used like #user-0
+AGENT_SEED ?= "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+AGENT_KEY_NAME ?= "00"  # along with seed used to create DID
+# AGENT_NAME  # stored in did document, if unset default used like #agent-0
+
 QAPI_URL ?= http://localhost:8081/qapi
 RESOLVER_HOST ?= http://localhost:5000
 VERIFY_SSL ?= False
+LOG_LEVEL ?= INFO
 
 docker-run: docker-build  ## Docker run of the publisher against a running host (see README)
 	$Q docker run --rm --network host \
 		-e {{cookiecutter.conf_env_var_prefix}}QAPI_URL=$(QAPI_URL)	\
 		-e {{cookiecutter.conf_env_var_prefix}}AUTH__RESOLVER_HOST=$(RESOLVER_HOST) \
-        -e {{cookiecutter.conf_env_var_prefix}}AUTH__SEED=$(SEED) \
-        -e {{cookiecutter.conf_env_var_prefix}}AUTH__USER=$(HOST_USER) \
-		-e {{cookiecutter.conf_env_var_prefix}}ROOT_LOG_LEVEL=DEBUG \
+        -e {{cookiecutter.conf_env_var_prefix}}AUTH__USER_SEED=$(USER_SEED) \
+        -e {{cookiecutter.conf_env_var_prefix}}AUTH__USER_KEY_NAME=$(USER_KEY_NAME) \
+        -e {{cookiecutter.conf_env_var_prefix}}AUTH__USER_NAME=$(USER_NAME) \
+        -e {{cookiecutter.conf_env_var_prefix}}AUTH__AGENT_SEED=$(AGENT_SEED) \
+        -e {{cookiecutter.conf_env_var_prefix}}AUTH__AGENT_KEY_NAME=$(AGENT_KEY_NAME) \
+        -e {{cookiecutter.conf_env_var_prefix}}AUTH__AGENT_NAME=$(AGENT_NAME) \
+		-e {{cookiecutter.conf_env_var_prefix}}ROOT_LOG_LEVEL=$(LOG_LEVEL) \
 		-e {{cookiecutter.conf_env_var_prefix}}VERFIY_SSL=$(VERIFY_SSL) \
 		$(APP_NAME)
 run:
-	$Q {{cookiecutter.conf_env_var_prefix}}ROOT_LOG_LEVEL=INFO \
-	   {{cookiecutter.conf_env_var_prefix}}AUTH__RESOLVER_HOST=$(RESOLVER_HOST) \
+	$Q {{cookiecutter.conf_env_var_prefix}}ROOT_LOG_LEVEL=$(LOG_LEVEL) \
 	   {{cookiecutter.conf_env_var_prefix}}QAPI_URL=$(QAPI_URL) \
-	   {{cookiecutter.conf_env_var_prefix}}AUTH__SEED=$(SEED) \
-	   {{cookiecutter.conf_env_var_prefix}}AUTH__USER=$(HOST_USER) \
+	   {{cookiecutter.conf_env_var_prefix}}AUTH__RESOLVER_HOST=$(RESOLVER_HOST) \
+	   {{cookiecutter.conf_env_var_prefix}}AUTH__USER_SEED=$(USER_SEED) \
+	   {{cookiecutter.conf_env_var_prefix}}AUTH__USER_KEY_NAME=$(USER_KEY_NAME) \
+	   {{cookiecutter.conf_env_var_prefix}}AUTH__USER_NAME=$(USER_NAME) \
+	   {{cookiecutter.conf_env_var_prefix}}AUTH__AGENT_SEED=$(AGENT_SEED) \
+	   {{cookiecutter.conf_env_var_prefix}}AUTH__AGENT_KEY_NAME=$(AGENT_KEY_NAME) \
+	   {{cookiecutter.conf_env_var_prefix}}AUTH__AGENT_NAME=$(AGENT_NAME) \
 	   {{cookiecutter.conf_env_var_prefix}}VERIFY_SSL=$(VERIFY_SSL) \
 	   {{cookiecutter.command_name}}

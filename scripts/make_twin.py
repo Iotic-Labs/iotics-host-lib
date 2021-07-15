@@ -4,20 +4,30 @@
 import os
 import sys
 
-from iotic.lib.identity import Identifier, IdentityClient, Document
-from iotic.lib.identity.resolver import HttpResolverClient
+from iotics.lib.identity.api.high_level_api import get_rest_high_level_identity_api
 
 
 def main():
-    if not os.environ.get('RESOLVER_HOST'):
-        print('Error: RESOLVER_HOST environment must be set')
+
+    resolver = os.environ.get('RESOLVER_HOST')
+
+    user_seed = os.environ.get('USER_SEED')
+    user_key_name = os.environ.get('USER_KEY_NAME')
+
+    agent_seed = os.environ.get('AGENT_SEED')
+    agent_key_name = os.environ.get('AGENT_KEY_NAME')
+
+    if not all([resolver, user_key_name, user_seed, agent_key_name, agent_seed]):
+        print('Error: RESOLVER_HOST, USER_KEY_NAME, USER_SEED, AGENT_KEY_NAME and AGENT_SEED must all be set')
         sys.exit(1)
 
-    audience = os.environ.get('RESOLVER_HOST', 'audience')
-    agent_seed = os.environ.get('SEED')
-    if not agent_seed:
-        print('Error: Must set SEED environment variable from gen_creds.py')
-        sys.exit(1)
+    api = get_rest_high_level_identity_api(resolver)
+
+    _, agent_registered_id = api.create_user_and_agent_with_auth_delegation(
+        user_seed=bytes.fromhex(user_seed), user_key_name=user_key_name,
+        agent_seed=bytes.fromhex(agent_seed), agent_key_name=agent_key_name,
+        delegation_name='#AuthDeleg'
+    )
 
     try:
         twin_num = int(sys.argv[1])
@@ -25,35 +35,15 @@ def main():
         print('usage: ./make_twin.py 1 <-- number required. Used for key number')
         sys.exit(1)
 
-    master = Identifier.seed_to_master(agent_seed)
+    twin_seed, twin_key_name, twin_name = bytes.fromhex(agent_seed), f'#MyTwin{twin_num}Key', f'#MyTwin{twin_num}Name'
 
-    # Shortcut to get the agent ID needed for delegation
-    private_key_hex = Identifier.new_private_hex_from_path(master, Identifier.DIDType.AGENT, count=0)
-    agent_private_key_ecdsa = Identifier.private_hex_to_ECDSA(private_key_hex)
-    agent_doc = Document.new_did_document(Identifier.DIDType.AGENT, agent_private_key_ecdsa)
+    twin_registered_id = api.create_twin_with_control_delegation(
+        twin_seed=twin_seed, twin_key_name=twin_key_name, twin_name=twin_name,
+        agent_registered_identity=agent_registered_id,
+        delegation_name='#ControlDeleg'
+    )
 
-    # Create the Twin Keys from Agent Seed and command line number
-    private_key_hex = Identifier.new_private_hex_from_path(master, Identifier.DIDType.TWIN, count=twin_num)
-    twin_private_key_ecdsa = Identifier.private_hex_to_ECDSA(private_key_hex)
-
-    twin_doc = Document.new_did_document(Identifier.DIDType.TWIN, twin_private_key_ecdsa)
-
-    # Allow the Agent to control this Twin
-    proof = Document.new_proof(twin_doc.id.encode('ascii'), agent_private_key_ecdsa)
-    delegation = Document.new_delegation('#agent', agent_doc.id + agent_doc.public_keys[0].id, proof)
-    twin_doc.add_control_delegation(delegation)
-
-    issuer = twin_doc.id + twin_doc.public_keys[0].id
-    token = Document.new_document_token(twin_doc,
-                                        audience,
-                                        issuer,
-                                        twin_private_key_ecdsa)
-
-    resolver = HttpResolverClient(audience)
-    idc = IdentityClient(resolver)
-    idc.register(token)
-
-    print(f'Twin ID: {twin_doc.id}')
+    print(f'Twin ID: {twin_registered_id.did}')
 
 
 if __name__ == '__main__':

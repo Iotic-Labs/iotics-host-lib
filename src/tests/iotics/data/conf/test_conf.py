@@ -16,8 +16,12 @@ def file_conf_data():
     return {
         'qapi_url': 'http://localhost:8080',
         'root_log_level': 'DEBUG',
-        'auth': {'seed': 'a seed',
-                 'user': 'did:iotics:USERKEY',
+        'auth': {'user_seed': 'a user seed',
+                 'user_key_name': 'a user key name',
+                 'user_name': 'a user name',
+                 'agent_seed': 'an agent seed',
+                 'agent_key_name': 'an agent key name',
+                 'agent_name': 'an agent name',
                  'resolver_host': 'http://plop'},
         'ext_url': 'https://ext_api',
         'a_float_value': '12.3',
@@ -43,8 +47,12 @@ def test_should_load_conf_data_from_environment():
         # variables can be lower case
         f'{ENV_VAR_PREFIX}qapi_url': 'http://localhost:8080',
         f'{ENV_VAR_PREFIX}ROOT_LOG_LEVEL': 'DEBUG',
-        f'{ENV_VAR_PREFIX}AUTH__SEED': 'a seed',
-        f'{ENV_VAR_PREFIX}AUTH__USER': 'did:iotics:USERKEY',
+        f'{ENV_VAR_PREFIX}AUTH__USER_SEED': 'a user seed',
+        f'{ENV_VAR_PREFIX}AUTH__USER_KEY_NAME': 'a user key name',
+        f'{ENV_VAR_PREFIX}AUTH__USER_NAME': 'a user name',
+        f'{ENV_VAR_PREFIX}AUTH__AGENT_SEED': 'an agent seed',
+        f'{ENV_VAR_PREFIX}AUTH__AGENT_KEY_NAME': 'an agent key name',
+        f'{ENV_VAR_PREFIX}AUTH__AGENT_NAME': 'an agent name',
         f'{ENV_VAR_PREFIX}AUTH__RESOLVER_HOST': 'http://plop',
         f'{ENV_VAR_PREFIX}EXT_url': 'https://ext_api',
         f'{ENV_VAR_PREFIX}A_FLOAT_VALUE': '12.3',
@@ -55,8 +63,12 @@ def test_should_load_conf_data_from_environment():
     assert conf.root_log_level == env_conf_data[f'{ENV_VAR_PREFIX}ROOT_LOG_LEVEL']
     assert conf.ext_url == env_conf_data[f'{ENV_VAR_PREFIX}EXT_url']
     assert conf.a_float_value == float(env_conf_data[f'{ENV_VAR_PREFIX}A_FLOAT_VALUE'])
-    assert conf.auth.seed == env_conf_data[f'{ENV_VAR_PREFIX}AUTH__SEED']
-    assert conf.auth.user == env_conf_data[f'{ENV_VAR_PREFIX}AUTH__USER']
+    assert conf.auth.user_seed == env_conf_data[f'{ENV_VAR_PREFIX}AUTH__USER_SEED']
+    assert conf.auth.user_key_name == env_conf_data[f'{ENV_VAR_PREFIX}AUTH__USER_KEY_NAME']
+    assert conf.auth.user_name == env_conf_data[f'{ENV_VAR_PREFIX}AUTH__USER_NAME']
+    assert conf.auth.agent_seed == env_conf_data[f'{ENV_VAR_PREFIX}AUTH__AGENT_SEED']
+    assert conf.auth.agent_key_name == env_conf_data[f'{ENV_VAR_PREFIX}AUTH__AGENT_KEY_NAME']
+    assert conf.auth.agent_name == env_conf_data[f'{ENV_VAR_PREFIX}AUTH__AGENT_NAME']
 
 
 def test_should_load_conf_data_from_yaml_file(file_conf_data, conf_yaml_file):
@@ -65,21 +77,27 @@ def test_should_load_conf_data_from_yaml_file(file_conf_data, conf_yaml_file):
     assert conf.root_log_level == file_conf_data['root_log_level']
     assert conf.ext_url == file_conf_data['ext_url']
     assert conf.a_float_value == float(file_conf_data['a_float_value'])
-    assert conf.auth.seed == file_conf_data['auth']['seed']
-    assert conf.auth.user == file_conf_data['auth']['user']
+    assert conf.auth.user_seed == file_conf_data['auth']['user_seed']
+    assert conf.auth.user_key_name == file_conf_data['auth']['user_key_name']
+    assert conf.auth.user_name == file_conf_data['auth']['user_name']
+    assert conf.auth.agent_seed == file_conf_data['auth']['agent_seed']
+    assert conf.auth.agent_key_name == file_conf_data['auth']['agent_key_name']
+    assert conf.auth.agent_name == file_conf_data['auth']['agent_name']
 
 
 def test_get_conf_file_should_be_overwritten_with_env(work_dir, conf_yaml_file, file_conf_data):
     env_conf_data = {
         f'{ENV_VAR_PREFIX}QAPI_URL': 'http://demo:9090',
-        f'{ENV_VAR_PREFIX}AUTH__SEED': 'an other seed',
+        f'{ENV_VAR_PREFIX}AUTH__USER_SEED': 'an other seed',
     }
     assert file_conf_data['qapi_url'] != env_conf_data[f'{ENV_VAR_PREFIX}QAPI_URL'], 'test configuration error'
-    assert file_conf_data['auth']['seed'] != env_conf_data[f'{ENV_VAR_PREFIX}AUTH__SEED'], 'test configuration error'
+    assert file_conf_data['auth']['user_seed'] !=\
+        env_conf_data[f'{ENV_VAR_PREFIX}AUTH__USER_SEED'], 'test configuration error'
+
     with set_env(env_conf_data):
         conf = get_conf(AmazingConnectorConf, ENV_VAR_PREFIX, file_path=conf_yaml_file)
     assert conf.qapi_url == env_conf_data[f'{ENV_VAR_PREFIX}QAPI_URL']
-    assert conf.auth.seed == env_conf_data[f'{ENV_VAR_PREFIX}AUTH__SEED']
+    assert conf.auth.user_seed == env_conf_data[f'{ENV_VAR_PREFIX}AUTH__USER_SEED']
 
 
 def test_get_conf_should_raise_an_error_if_not_a_file(work_dir):
@@ -110,8 +128,8 @@ def test_get_conf_should_raise_an_error_if_invalid_conf_from_file(work_dir, file
 
 def test_get_conf_should_raise_an_error_if_invalid_conf_from_env(work_dir):
     env_conf_data = {
-        f'{ENV_VAR_PREFIX}AUTH__SEED': 'a seed',
-        f'{ENV_VAR_PREFIX}AUTH__USER': 'did:iotics:USERKEY',
+        f'{ENV_VAR_PREFIX}AUTH__USER_SEED': 'a user eed',
+        f'{ENV_VAR_PREFIX}AUTH__USER_KEY_NAME': 'a user key name',
         f'{ENV_VAR_PREFIX}A_FLOAT_VALUE': 'not an float',
     }
     with set_env(env_conf_data), pytest.raises(DataSourcesConfigurationError) as err_wrapper:
@@ -121,7 +139,7 @@ def test_get_conf_should_raise_an_error_if_invalid_conf_from_env(work_dir):
 
 def test_get_conf_should_raise_an_error_if_missing_mandatory_field(work_dir):
     env_conf_data = {
-        f'{ENV_VAR_PREFIX}AUTH__SEED': 'a seed',
+        f'{ENV_VAR_PREFIX}AUTH__USER_SEED': 'a user seed',
         f'{ENV_VAR_PREFIX}A_FLOAT_VALUE': 'not an float',
     }
     with set_env(env_conf_data), pytest.raises(DataSourcesConfigurationError) as err_wrapper:

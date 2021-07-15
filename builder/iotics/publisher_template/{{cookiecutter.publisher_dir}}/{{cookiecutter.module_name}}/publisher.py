@@ -48,7 +48,7 @@ class {{cookiecutter.publisher_class_name}}:
 
     def _create_twin(self) -> str:
         # Create an twin id in the registerer
-        twin_id, _, _ = self.agent_auth.make_twin_id(TWIN_NAME)
+        twin_id = self.agent_auth.make_twin_id(TWIN_NAME)
 
         # Create the twin
         self.twin_api.create_twin(twin_id)
@@ -155,7 +155,11 @@ def run_publisher():
         logging.basicConfig(
             format={{"'%(asctime)s %(levelname)s [%(name)s] {%(threadName)s} %(message)s'"}}, level=conf.root_log_level
         )
-        agent_auth = AgentAuthBuilder.build_agent_auth(conf.auth.resolver_host, conf.auth.seed, conf.auth.user)
+        agent_auth = AgentAuthBuilder.build_agent_auth(
+            resolver_url=conf.auth.resolver_host, user_seed=conf.auth.user_seed, user_key_name=conf.auth.user_key_name,
+            agent_seed=conf.auth.agent_seed, agent_key_name=conf.auth.agent_key_name,
+            user_name=conf.auth.user_name, agent_name=conf.auth.agent_name
+        )
         qapi_factory = QApiFactory(conf, agent_auth, client_app_id=f'{{cookiecutter.module_name}}_{uuid4()}')
 {% if cookiecutter.add_example_code == "NO" %}
         # TODO: update the publisher instantiation
