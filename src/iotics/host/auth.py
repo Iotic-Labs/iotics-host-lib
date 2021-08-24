@@ -83,8 +83,7 @@ class AgentAuthBuilder:
         try:
             user_did, agent_did = api.create_user_and_agent_with_auth_delegation(
                 user_seed=bytes.fromhex(user_seed), user_key_name=user_key_name, user_name=user_name,
-                agent_seed=bytes.fromhex(agent_seed), agent_key_name=agent_key_name, agent_name=agent_name,
-                delegation_name='#AuthDeleg'
+                agent_seed=bytes.fromhex(agent_seed), agent_key_name=agent_key_name, agent_name=agent_name
             )
         except IdentityResolverCommunicationError as err:
             raise DataSourcesAuthException(err) from err
