@@ -25,8 +25,7 @@ def main():
 
     user_registered_id, agent_registered_id = api.create_user_and_agent_with_auth_delegation(
         user_seed=bytes.fromhex(user_seed), user_key_name=user_key_name,
-        agent_seed=bytes.fromhex(agent_seed), agent_key_name=agent_key_name,
-        delegation_name='#AuthDeleg'
+        agent_seed=bytes.fromhex(agent_seed), agent_key_name=agent_key_name
     )
 
     # -- Create token -------------------------------------------------------------------------------------------------- #
