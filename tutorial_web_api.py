@@ -1,6 +1,6 @@
 import base64
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 import requests
@@ -30,6 +30,13 @@ ALLOW_ALL_HOSTS_PROPERTY = {
     "key": "http://data.iotics.com/public#hostAllowList",
     "uriValue": {"value": "http://data.iotics.com/public#allHosts"},
 }
+SENSOR_TYPE_PROPERTY = {
+    "key": "http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
+    "uriValue": {"value": "https://data.iotics.com/tutorial#Sensor"},
+}
+CREATED_FROM_MODEL_KEY = "https://data.iotics.com/app#model"
+SERIAL_NUMBER_KEY = "https://data.iotics.com/tutorial#serialNumber"
+
 FEED_ID = "currentTemp"
 VALUE_LABEL = "temperature"
 
@@ -182,26 +189,15 @@ def get_sensor_data():
     return response.json()
 
 
-def create_stomp_client():
-    resp = requests.get(f"{HOST}/index.json").json()
-    stomp_endpoint = resp["stomp"]
-    stomp_client = StompWSConnection12(endpoint=stomp_endpoint)
-    stomp_client.set_ssl(verify=False)
-
-    return stomp_client
-
-
 def search_by_properties(user_registered_id, agent_registered_id):
-    now = datetime.now()
+    now = datetime.now(tz=timezone.utc)
     headers = create_headers(
         user_registered_id=user_registered_id,
         agent_registered_id=agent_registered_id,
     )
-    headers["Iotics-RequestTimeout"] = (now + timedelta(seconds=5)).strftime(
-        "%Y-%m-%dT%H:%M:%S+00:00"
-    )
+    headers["Iotics-RequestTimeout"] = (now + timedelta(seconds=5)).isoformat()
 
-    payload = {"filter": {"properties": [MODEL_TYPE_PROPERTY]}}
+    payload = {"filter": {"properties": [MODEL_TYPE_PROPERTY]}, "responseType": "FULL"}
 
     model_twin = {}
 
@@ -223,7 +219,7 @@ def search_by_properties(user_registered_id, agent_registered_id):
             else:
                 break
 
-    print(model_twin)
+    print("model_twin:", model_twin)
 
     return model_twin
 
@@ -232,14 +228,121 @@ def create_machine_from_model(user_registered_id, agent_registered_id):
     model_twin = search_by_properties(user_registered_id, agent_registered_id)
     data = get_sensor_data()
 
+    headers = create_headers(
+        user_registered_id=user_registered_id,
+        agent_registered_id=agent_registered_id,
+    )
+
     for machine_number, sensor_data in enumerate(data):
         machine_name = f"machine_{machine_number}"
         machine_twin_id = create_twin(
             machine_name, user_registered_id, agent_registered_id
         )
-        # create feed
-        # create value
-        # share data
+
+        # Add properties
+        model_twin_did = model_twin["id"]["value"]
+        payload = {
+            "location": {"location": {"lat": 51.5, "lon": -0.1}},
+            "labels": {
+                "added": [{"lang": "en", "value": f"{machine_name} (tutorial)"}]
+            },
+            "properties": {
+                "added": [
+                    ALLOW_ALL_HOSTS_PROPERTY,
+                    SENSOR_TYPE_PROPERTY,
+                    {
+                        "key": CREATED_FROM_MODEL_KEY,
+                        "uriValue": {"value": model_twin_did},
+                    },
+                    {
+                        "key": SERIAL_NUMBER_KEY,
+                        "stringLiteralValue": {"value": "%06d" % machine_number},
+                    },
+                ],
+                "clearedAll": True,
+            },
+            "newVisibility": {"visibility": "PUBLIC"},
+        }
+
+        r = requests.patch(
+            f"{HOST}/qapi/twins/{machine_twin_id}",
+            headers=headers,
+            data=json.dumps(payload),
+        )
+
+        print("ADD PROPERTIES status_code", r.status_code)
+
+        # Add Feeds
+        for feed in model_twin["feeds"]:
+            feed_id = feed["feed"]["id"]["value"]
+            feed_store_last = feed["storeLast"]
+
+            feed_payload = {"feedId": {"value": feed_id}, "storeLast": feed_store_last}
+
+            r = requests.post(
+                f"{HOST}/qapi/twins/{machine_twin_id}/feeds",
+                headers=headers,
+                json=feed_payload,
+            )
+            print("ADD FEED status_code", r.status_code)
+
+            # Describe feed
+            r = requests.get(
+                f"{HOST}/qapi/twins/{model_twin_did}/feeds/{feed_id}",
+                headers=headers,
+            )
+
+            feed_description = json.loads(r.text)
+            print("feed_description:", feed_description)
+
+            feed_label = feed_description["result"]["labels"][0]["value"]
+            feed_lang = feed_description["result"]["labels"][0]["lang"]
+            feed_values = feed_description["result"]["values"]
+
+            # Add Value
+            value_payload = {
+                "storeLast": feed_store_last,
+                "labels": {"added": [{"lang": feed_lang, "value": feed_label}]},
+                "values": {"added": []},
+            }
+
+            for value in feed_values:
+                value_comment = value["comment"]
+                value_label = value["label"]
+                value_unit = value["unit"]
+                value_datatype = value["dataType"]
+
+                val = {
+                    "comment": value_comment,
+                    "dataType": value_datatype,
+                    "label": value_label,
+                    "unit": value_unit,
+                }
+                value_payload["values"]["added"].append(val)
+
+            r = requests.patch(
+                f"{HOST}/qapi/twins/{machine_twin_id}/feeds/{feed_id}",
+                headers=headers,
+                json=value_payload,
+            )
+            print("ADD VALUE status_code", r.status_code)
+
+        data_to_share = {VALUE_LABEL: sensor_data["temp"]}
+        encoded_data = base64.b64encode(json.dumps(data_to_share).encode()).decode()
+        data_to_share_payload = {
+            "sample": {
+                "data": encoded_data,
+                "mime": "application/json",
+                "occurredAt": datetime.now(tz=timezone.utc).isoformat(),
+            }
+        }
+
+        r = requests.post(
+            f"{HOST}/qapi/twins/{machine_twin_id}/feeds/{feed_id}/shares",
+            headers=headers,
+            json=data_to_share_payload,
+        )
+        print("SHARE SAMPLE DATA status_code", r.status_code)
 
 
 def main():
