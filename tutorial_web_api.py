@@ -1,9 +1,9 @@
 import base64
 import json
-import logging
 from datetime import datetime, timedelta, timezone
 from time import sleep
 from uuid import uuid4
+from functools import partial
 
 import requests
 import shortuuid
@@ -75,9 +75,6 @@ OUTPUT_VALUE_LABEL = "status"
 SUBSCRIPTIONS_MAP = {}
 
 
-logger = logging.getLogger(__name__)
-
-
 class Tutorial:
     def __init__(self):
         self._client_app_id = f"randpub_{uuid4()}"
@@ -127,7 +124,7 @@ class Tutorial:
             data=json.dumps(payload),
         )
 
-        print("ADD PROPERTIES status_code", r.status_code)
+        # print("ADD PROPERTIES status_code", r.status_code)
 
         # Add Feed
         feed_payload = {"feedId": {"value": FEED_ID}, "storeLast": True}
@@ -142,7 +139,8 @@ class Tutorial:
             ),
             json=feed_payload,
         )
-        print("ADD FEED status_code", r.status_code)
+
+        # print("ADD FEED status_code", r.status_code)
 
         # Add Value
         payload = {
@@ -170,7 +168,7 @@ class Tutorial:
             ),
             json=payload,
         )
-        print("ADD VALUE status_code", r.status_code)
+        # print("ADD VALUE status_code", r.status_code)
 
         return model_twin_did
 
@@ -197,7 +195,7 @@ class Tutorial:
             json=payload,
         )
 
-        print("CREATE TWIN text:", r.text)
+        # print("CREATE TWIN text:", r.text)
 
         return twin_registered_id.did
 
@@ -205,7 +203,11 @@ class Tutorial:
         model_twin = self._search_by_properties()
         data = get_sensor_data()
 
+        counter = 0  # to remove
+
         for machine_number, sensor_data in enumerate(data):
+            if counter > 2:
+                break
             machine_name = f"machine_{machine_number}"
             machine_twin_id = self._create_twin(twin_key_name=machine_name)
 
@@ -245,7 +247,7 @@ class Tutorial:
                 data=json.dumps(payload),
             )
 
-            print("ADD PROPERTIES status_code", r.status_code)
+            # print("ADD PROPERTIES status_code", r.status_code)
 
             # Add Feeds
             for feed in model_twin["feeds"]:
@@ -267,7 +269,7 @@ class Tutorial:
                     ),
                     json=feed_payload,
                 )
-                print("ADD FEED status_code", r.status_code)
+                # print("ADD FEED status_code", r.status_code)
 
                 # Describe feed
                 r = requests.get(
@@ -281,7 +283,7 @@ class Tutorial:
                 )
 
                 feed_description = json.loads(r.text)
-                print("feed_description:", feed_description)
+                # print("feed_description:", feed_description)
 
                 feed_label = feed_description["result"]["labels"][0]["value"]
                 feed_lang = feed_description["result"]["labels"][0]["lang"]
@@ -318,7 +320,7 @@ class Tutorial:
                     ),
                     json=value_payload,
                 )
-                print("ADD VALUE status_code", r.status_code)
+                # print("ADD VALUE status_code", r.status_code)
 
             data_to_share = {VALUE_LABEL: sensor_data["temp"]}
             encoded_data = base64.b64encode(json.dumps(data_to_share).encode()).decode()
@@ -340,10 +342,11 @@ class Tutorial:
                 ),
                 json=data_to_share_payload,
             )
-            print("SHARE SAMPLE DATA status_code", r.status_code)
+            # print("SHARE SAMPLE DATA status_code", r.status_code)
 
             self._sensors_map[machine_name] = machine_twin_id
             print("Machine twin created:", machine_name)
+            counter += 1
 
     def create_interaction(self, model_twin_did):
         # Create Interaction twin
@@ -359,7 +362,7 @@ class Tutorial:
                         "conditions": [
                             {
                                 "fieldsIncludedInOutput": [VALUE_LABEL],
-                                "jsonLogic": {">": [{"var": VALUE_LABEL}, 30]},
+                                "jsonLogic": {">": [{"var": VALUE_LABEL}, 25]},
                             }
                         ],
                         "outputFeedId": OUTPUT_FEED_NAME,
@@ -423,7 +426,7 @@ class Tutorial:
             data=json.dumps(payload),
         )
 
-        print("ADD PROPERTIES status_code", r.status_code)
+        # print("ADD PROPERTIES status_code", r.status_code)
 
         # Add Feed
         feed_payload = {"feedId": {"value": OUTPUT_FEED_NAME}, "storeLast": True}
@@ -438,7 +441,7 @@ class Tutorial:
             ),
             json=feed_payload,
         )
-        print("ADD FEED status_code", r.status_code)
+        # print("ADD FEED status_code", r.status_code)
 
         # Add Value
         payload = {
@@ -465,7 +468,7 @@ class Tutorial:
             ),
             json=payload,
         )
-        print("ADD VALUE status_code", r.status_code)
+        # print("ADD VALUE status_code", r.status_code)
 
         return twin_did
 
@@ -497,7 +500,7 @@ class Tutorial:
                 ),
                 json=data_to_share_payload,
             )
-            print("SHARE SAMPLE DATA status_code", r.status_code)
+            # print("SHARE SAMPLE DATA status_code", r.status_code)
 
     def _search_by_properties(self):
         now = datetime.now(tz=timezone.utc)
@@ -536,7 +539,7 @@ class Tutorial:
                 else:
                     break
 
-        print("model_twin:", model_twin)
+        # print("model_twin:", model_twin)
 
         return model_twin
 
@@ -585,14 +588,13 @@ class Tutorial:
                     else:
                         break
 
-            # print("output_twins:", output_twins)
             sleep(10)
             # print(".", end="", flush=True)
 
         print("\nFound %s output twins" % len(output_twins))
 
         for sensor in output_twins:
-            print("sensor:", sensor)
+            # print("sensor:", sensor)
             sensor_id = sensor["id"]["value"]
             subscription_id = self._subscribe_to_feed(
                 sensor_id, sensor_id, OUTPUT_FEED_NAME, follow_callback
@@ -628,22 +630,7 @@ class Tutorial:
             headers=self._headers,
         )
 
-        return self._headers["Iotics-ClientRef"]
-
-        # r = requests.get(
-        #     f"{HOST}/qapi/twins/{follower_twin_id}/interests/twins/{followed_twin_id}"
-        #     f"/feeds/{followed_feed_name}/samples/last",
-        #     headers=get_headers(
-        #         self._user_registered_id,
-        #         self._agent_registered_id,
-        #         self._client_ref,
-        #         self._client_app_id,
-        #     ),
-        # )
-
-        # result = json.loads(r.text)
-
-        # print("subscribe_to_feed:", result)
+        return follower_twin_id
 
 
 class StompClient:
@@ -696,7 +683,7 @@ class StompListener(stomp.ConnectionListener):
         print('received an error "%s"' % body)
 
     def on_message(self, headers, body):
-        print("received a message:%s" % body)
+        # print("received a message header:%s" % headers)
         self._callback(headers, body)
 
     def on_disconnected(self):
@@ -705,8 +692,10 @@ class StompListener(stomp.ConnectionListener):
 
 
 def follow_callback(headers, body):
-    sub_id = json.dumps(headers["Iotics-ClientRef"])
-    data = json.dumps(body["feedData"]["data"])
+    body = json.loads(body)
+    sub_id = headers["destination"].split("/")[3]
+    data = body["feedData"]["data"]
+
     sensor = SUBSCRIPTIONS_MAP[sub_id]
     interaction_data = json.loads(base64.b64decode(data).decode("ascii"))
 
