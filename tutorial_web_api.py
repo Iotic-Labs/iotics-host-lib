@@ -3,13 +3,13 @@ import json
 from datetime import datetime, timedelta, timezone
 from time import sleep
 from uuid import uuid4
-from functools import partial
 
 import requests
 import shortuuid
+import stomp
 from iotic.web.stomp.client import StompWSConnection12
 from iotics.lib.identity.api.high_level_api import get_rest_high_level_identity_api
-import stomp
+from requests import Request, Session
 
 # Localhost
 # RESOLVER_URL = "http://localhost:5000"
@@ -83,6 +83,8 @@ class Tutorial:
         self._user_registered_id = None
         self._headers = None
         self._sensors_map = {}
+        self._session = None
+        self._stomp_endpoint = None
 
     def setup(self):
         (
@@ -98,6 +100,42 @@ class Tutorial:
 
         self._user_registered_id = user_registered_id
         self._agent_registered_id = agent_registered_id
+        self._session = Session()
+        response = self._make_api_call(method="get", url=f"{HOST}/index.json")
+        index_json = json.loads(response.text)
+        self._stomp_endpoint = index_json["stomp"]
+        self._headers = get_headers(
+            self._user_registered_id,
+            self._agent_registered_id,
+            self._client_ref,
+            self._client_app_id,
+        )
+
+    def _make_api_call(self, method, url, data=None, json=None):
+        headers = get_headers(
+            self._user_registered_id,
+            self._agent_registered_id,
+            self._client_ref,
+            self._client_app_id,
+        )
+
+        req = Request(
+            method=method,
+            url=url,
+            headers=headers,
+            data=data,
+            json=json,
+        )
+
+        prep_req = req.prepare()
+        response = self._session.send(prep_req)
+
+        try:
+            response.raise_for_status()
+        except Exception as ex:
+            print("An exception has occurred:", ex)
+
+        return response
 
     def create_model(self):
         # Create Model twin
@@ -113,34 +151,20 @@ class Tutorial:
             "newVisibility": {"visibility": "PUBLIC"},
         }
 
-        r = requests.patch(
-            f"{HOST}/qapi/twins/{model_twin_did}",
-            headers=get_headers(
-                self._user_registered_id,
-                self._agent_registered_id,
-                self._client_ref,
-                self._client_app_id,
-            ),
+        self._make_api_call(
+            method="patch",
+            url=f"{HOST}/qapi/twins/{model_twin_did}",
             data=json.dumps(payload),
         )
-
-        # print("ADD PROPERTIES status_code", r.status_code)
 
         # Add Feed
         feed_payload = {"feedId": {"value": FEED_ID}, "storeLast": True}
 
-        r = requests.post(
-            f"{HOST}/qapi/twins/{model_twin_did}/feeds",
-            headers=get_headers(
-                self._user_registered_id,
-                self._agent_registered_id,
-                self._client_ref,
-                self._client_app_id,
-            ),
+        self._make_api_call(
+            method="post",
+            url=f"{HOST}/qapi/twins/{model_twin_did}/feeds",
             json=feed_payload,
         )
-
-        # print("ADD FEED status_code", r.status_code)
 
         # Add Value
         payload = {
@@ -158,17 +182,13 @@ class Tutorial:
             },
         }
 
-        r = requests.patch(
-            f"{HOST}/qapi/twins/{model_twin_did}/feeds/{FEED_ID}",
-            headers=get_headers(
-                self._user_registered_id,
-                self._agent_registered_id,
-                self._client_ref,
-                self._client_app_id,
-            ),
+        self._make_api_call(
+            method="patch",
+            url=f"{HOST}/qapi/twins/{model_twin_did}/feeds/{FEED_ID}",
             json=payload,
         )
-        # print("ADD VALUE status_code", r.status_code)
+
+        print("Model twin created")
 
         return model_twin_did
 
@@ -180,27 +200,17 @@ class Tutorial:
             delegation_name=CONTROL_DELEGATION_NAME,
         )
 
-        print("twin_registered_id.did:", twin_registered_id.did)
-
-        payload = {"twinId": {"value": twin_registered_id.did}}
-
-        r = requests.post(
-            f"{HOST}/qapi/twins",
-            headers=get_headers(
-                self._user_registered_id,
-                self._agent_registered_id,
-                self._client_ref,
-                self._client_app_id,
-            ),
-            json=payload,
+        self._make_api_call(
+            method="post",
+            url=f"{HOST}/qapi/twins",
+            json={"twinId": {"value": twin_registered_id.did}},
         )
-
-        # print("CREATE TWIN text:", r.text)
 
         return twin_registered_id.did
 
     def create_machine_from_model(self):
-        model_twin = self._search_by_properties()
+        twins_list = self._search_twins_by_properties([MODEL_TYPE_PROPERTY])
+        model_twin = twins_list[0]
         data = get_sensor_data()
 
         counter = 0  # to remove
@@ -236,18 +246,11 @@ class Tutorial:
                 "newVisibility": {"visibility": "PUBLIC"},
             }
 
-            r = requests.patch(
-                f"{HOST}/qapi/twins/{machine_twin_id}",
-                headers=get_headers(
-                    self._user_registered_id,
-                    self._agent_registered_id,
-                    self._client_ref,
-                    self._client_app_id,
-                ),
+            self._make_api_call(
+                method="patch",
+                url=f"{HOST}/qapi/twins/{machine_twin_id}",
                 data=json.dumps(payload),
             )
-
-            # print("ADD PROPERTIES status_code", r.status_code)
 
             # Add Feeds
             for feed in model_twin["feeds"]:
@@ -259,31 +262,19 @@ class Tutorial:
                     "storeLast": feed_store_last,
                 }
 
-                r = requests.post(
-                    f"{HOST}/qapi/twins/{machine_twin_id}/feeds",
-                    headers=get_headers(
-                        self._user_registered_id,
-                        self._agent_registered_id,
-                        self._client_ref,
-                        self._client_app_id,
-                    ),
+                self._make_api_call(
+                    method="post",
+                    url=f"{HOST}/qapi/twins/{machine_twin_id}/feeds",
                     json=feed_payload,
                 )
-                # print("ADD FEED status_code", r.status_code)
 
                 # Describe feed
-                r = requests.get(
-                    f"{HOST}/qapi/twins/{model_twin_did}/feeds/{feed_id}",
-                    headers=get_headers(
-                        self._user_registered_id,
-                        self._agent_registered_id,
-                        self._client_ref,
-                        self._client_app_id,
-                    ),
+                response = self._make_api_call(
+                    method="get",
+                    url=f"{HOST}/qapi/twins/{model_twin_did}/feeds/{feed_id}",
                 )
 
-                feed_description = json.loads(r.text)
-                # print("feed_description:", feed_description)
+                feed_description = json.loads(response.text)
 
                 feed_label = feed_description["result"]["labels"][0]["value"]
                 feed_lang = feed_description["result"]["labels"][0]["lang"]
@@ -310,17 +301,11 @@ class Tutorial:
                     }
                     value_payload["values"]["added"].append(val)
 
-                r = requests.patch(
-                    f"{HOST}/qapi/twins/{machine_twin_id}/feeds/{feed_id}",
-                    headers=get_headers(
-                        self._user_registered_id,
-                        self._agent_registered_id,
-                        self._client_ref,
-                        self._client_app_id,
-                    ),
+                self._make_api_call(
+                    method="patch",
+                    url=f"{HOST}/qapi/twins/{machine_twin_id}/feeds/{feed_id}",
                     json=value_payload,
                 )
-                # print("ADD VALUE status_code", r.status_code)
 
             data_to_share = {VALUE_LABEL: sensor_data["temp"]}
             encoded_data = base64.b64encode(json.dumps(data_to_share).encode()).decode()
@@ -332,17 +317,11 @@ class Tutorial:
                 }
             }
 
-            r = requests.post(
-                f"{HOST}/qapi/twins/{machine_twin_id}/feeds/{feed_id}/shares",
-                headers=get_headers(
-                    self._user_registered_id,
-                    self._agent_registered_id,
-                    self._client_ref,
-                    self._client_app_id,
-                ),
+            self._make_api_call(
+                method="post",
+                url=f"{HOST}/qapi/twins/{machine_twin_id}/feeds/{feed_id}/shares",
                 json=data_to_share_payload,
             )
-            # print("SHARE SAMPLE DATA status_code", r.status_code)
 
             self._sensors_map[machine_name] = machine_twin_id
             print("Machine twin created:", machine_name)
@@ -415,33 +394,18 @@ class Tutorial:
             "newVisibility": {"visibility": "PUBLIC"},
         }
 
-        r = requests.patch(
-            f"{HOST}/qapi/twins/{twin_did}",
-            headers=get_headers(
-                self._user_registered_id,
-                self._agent_registered_id,
-                self._client_ref,
-                self._client_app_id,
-            ),
+        self._make_api_call(
+            method="patch",
+            url=f"{HOST}/qapi/twins/{twin_did}",
             data=json.dumps(payload),
         )
 
-        # print("ADD PROPERTIES status_code", r.status_code)
-
         # Add Feed
-        feed_payload = {"feedId": {"value": OUTPUT_FEED_NAME}, "storeLast": True}
-
-        r = requests.post(
-            f"{HOST}/qapi/twins/{twin_did}/feeds",
-            headers=get_headers(
-                self._user_registered_id,
-                self._agent_registered_id,
-                self._client_ref,
-                self._client_app_id,
-            ),
-            json=feed_payload,
+        self._make_api_call(
+            method="post",
+            url=f"{HOST}/qapi/twins/{twin_did}/feeds",
+            json={"feedId": {"value": OUTPUT_FEED_NAME}, "storeLast": True},
         )
-        # print("ADD FEED status_code", r.status_code)
 
         # Add Value
         payload = {
@@ -458,17 +422,11 @@ class Tutorial:
             },
         }
 
-        r = requests.patch(
-            f"{HOST}/qapi/twins/{twin_did}/feeds/{OUTPUT_FEED_NAME}",
-            headers=get_headers(
-                self._user_registered_id,
-                self._agent_registered_id,
-                self._client_ref,
-                self._client_app_id,
-            ),
+        self._make_api_call(
+            method="patch",
+            url=f"{HOST}/qapi/twins/{twin_did}/feeds/{OUTPUT_FEED_NAME}",
             json=payload,
         )
-        # print("ADD VALUE status_code", r.status_code)
 
         return twin_did
 
@@ -490,36 +448,22 @@ class Tutorial:
 
             print("Sharing data for %s: %s" % (machine_name, data_to_share))
 
-            r = requests.post(
-                f"{HOST}/qapi/twins/{machine_twin_id}/feeds/{FEED_ID}/shares",
-                headers=get_headers(
-                    self._user_registered_id,
-                    self._agent_registered_id,
-                    self._client_ref,
-                    self._client_app_id,
-                ),
+            self._make_api_call(
+                method="post",
+                url=f"{HOST}/qapi/twins/{machine_twin_id}/feeds/{FEED_ID}/shares",
                 json=data_to_share_payload,
             )
-            # print("SHARE SAMPLE DATA status_code", r.status_code)
 
-    def _search_by_properties(self):
-        now = datetime.now(tz=timezone.utc)
-        self._headers = get_headers(
-            self._user_registered_id,
-            self._agent_registered_id,
-            self._client_ref,
-            self._client_app_id,
-        )
-        self._headers["Iotics-RequestTimeout"] = (
-            now + timedelta(seconds=5)
-        ).isoformat()
+    def _search_twins_by_properties(self, properties):
+        request_timeout = datetime.now(tz=timezone.utc) + timedelta(seconds=10)
+        self._headers.update({"Iotics-RequestTimeout": request_timeout.isoformat()})
 
         payload = {
-            "filter": {"properties": [MODEL_TYPE_PROPERTY], "text": "test"},
+            "filter": {"properties": properties, "text": "test"},
             "responseType": "FULL",
         }
 
-        model_twin = {}
+        twins_list = []
 
         with requests.post(
             f"{HOST}/qapi/searches",
@@ -533,68 +477,34 @@ class Tutorial:
             for chunk in resp.iter_lines():
                 response = json.loads(chunk)
                 try:
-                    model_twin = response["result"]["payload"]["twins"][0]
+                    twins_list = response["result"]["payload"]["twins"]
                 except (KeyError, IndexError):
                     continue
                 else:
                     break
 
-        # print("model_twin:", model_twin)
-
-        return model_twin
+        return twins_list
 
     def follow_sensors(self, interaction_twin_id):
         output_twins = []
-        self._headers = get_headers(
-            self._user_registered_id,
-            self._agent_registered_id,
-            self._client_ref,
-            self._client_app_id,
-        )
+
+        print("Searching for output twins", end="", flush=True)
 
         while len(output_twins) < len(self._sensors_map):
-            self._headers["Iotics-RequestTimeout"] = (
-                datetime.now(tz=timezone.utc) + timedelta(seconds=10)
-            ).isoformat()
-
-            payload = {
-                "filter": {
-                    "text": "test",
-                    "properties": [
-                        {
-                            "key": CREATED_FROM_MODEL_PREDICATE,
-                            "uriValue": {"value": interaction_twin_id},
-                        }
-                    ],
-                },
-                "responseType": "FULL",
-            }
-
-            with requests.post(
-                f"{HOST}/qapi/searches",
-                headers=self._headers,
-                json=payload,
-                stream=True,
-                verify=False,
-                params={"scope": "LOCAL"},
-            ) as resp:
-                resp.raise_for_status()
-                for chunk in resp.iter_lines():
-                    response = json.loads(chunk)
-                    try:
-                        output_twins = response["result"]["payload"]["twins"]
-                    except KeyError:
-                        continue
-                    else:
-                        break
-
+            output_twins = self._search_twins_by_properties(
+                properties=[
+                    {
+                        "key": CREATED_FROM_MODEL_PREDICATE,
+                        "uriValue": {"value": interaction_twin_id},
+                    }
+                ]
+            )
             sleep(10)
-            # print(".", end="", flush=True)
+            print(".", end="", flush=True)
 
         print("\nFound %s output twins" % len(output_twins))
 
         for sensor in output_twins:
-            # print("sensor:", sensor)
             sensor_id = sensor["id"]["value"]
             subscription_id = self._subscribe_to_feed(
                 sensor_id, sensor_id, OUTPUT_FEED_NAME, follow_callback
@@ -608,18 +518,10 @@ class Tutorial:
         followed_feed_name,
         callback,
     ):
-        self._headers = get_headers(
-            self._user_registered_id,
-            self._agent_registered_id,
-            self._client_ref,
-            self._client_app_id,
-        )
         feed_path = f"/qapi/twins/{follower_twin_id}/interests/twins/{followed_twin_id}/feeds/{followed_feed_name}"
 
-        resp = requests.get(f"{HOST}/index.json").json()
-        stomp_endpoint = resp["stomp"]
         stomp_client = StompClient(
-            endpoint=stomp_endpoint,
+            endpoint=self._stomp_endpoint,
             callback=callback,
             token=get_new_token(self._agent_registered_id, self._user_registered_id),
         )
@@ -661,8 +563,6 @@ class StompClient:
             "stomp_listener", StompListener(self._stomp_client, self._callback)
         )
 
-        # self._token = get_new_token()
-
         self._stomp_client.connect(wait=True, passcode=self._token)
 
     def subscribe(self, destination, subscription_id, headers):
@@ -683,7 +583,6 @@ class StompListener(stomp.ConnectionListener):
         print('received an error "%s"' % body)
 
     def on_message(self, headers, body):
-        # print("received a message header:%s" % headers)
         self._callback(headers, body)
 
     def on_disconnected(self):
@@ -692,9 +591,9 @@ class StompListener(stomp.ConnectionListener):
 
 
 def follow_callback(headers, body):
-    body = json.loads(body)
+    payload = json.loads(body)
     sub_id = headers["destination"].split("/")[3]
-    data = body["feedData"]["data"]
+    data = payload["feedData"]["data"]
 
     sensor = SUBSCRIPTIONS_MAP[sub_id]
     interaction_data = json.loads(base64.b64decode(data).decode("ascii"))
