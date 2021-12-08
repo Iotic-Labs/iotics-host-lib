@@ -2,140 +2,144 @@ import base64
 import json
 from datetime import datetime, timedelta, timezone
 from time import sleep
+from typing import NamedTuple
 from uuid import uuid4
 
-import requests
 import shortuuid
 import stomp
 from iotic.web.stomp.client import StompWSConnection12
 from iotics.lib.identity.api.high_level_api import get_rest_high_level_identity_api
-from requests import Request, Session
+from requests import request
 
-# Localhost
-# RESOLVER_URL = "http://localhost:5000"
-# HOST = "http://localhost:8081"
-# api = get_rest_high_level_identity_api(resolver_url=RESOLVER_URL)
-# USER_KEY_NAME = "#MyUserKey"
-# AGENT_KEY_NAME = "#MyAgentKey"
-# USER_SEED = bytes.fromhex(
-#     "a7631ed56882044021224d06c8deb966afb6a5db2115c805900b02c35b8188ce"
-# )
-# AGENT_SEED = bytes.fromhex(
-#     "0319fa3c553fe101ce2ce7876944af450609f9a823235dd4f25d8b5743d66a4a"
-# )
-
-# Sapples space
-RESOLVER_URL = "https://did.stg.iotics.com"
-HOST = "https://sapples-dev.dev.iotics.space"
-api = get_rest_high_level_identity_api(resolver_url=RESOLVER_URL)
-USER_KEY_NAME = "00"
-AGENT_KEY_NAME = "00"
-USER_SEED = bytes.fromhex(
-    "a7631ed56882044021224d06c8deb966afb6a5db2115c805900b02c35b8188ce"
-)
-AGENT_SEED = bytes.fromhex(
-    "1da9c9a589bb2763380a97124c474e316cba5ba0d98163790a5e31c59549f617"
-)
-
-AUTH_DELEGATION_NAME = "#AuthDeleg"
-CONTROL_DELEGATION_NAME = "#ControlDeleg"
-
-TOKEN_DURATION = 3600
+RESOLVER_URL = "<resolver url>"
+HOST = "<host url>"
+USER_KEY_NAME = "<from script output>"
+AGENT_KEY_NAME = "<from script output>"
+USER_SEED = bytes.fromhex("<from script output>")
+AGENT_SEED = bytes.fromhex("<from script output>")
 
 TWIN_TYPE_PREDICATE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
 CREATED_FROM_MODEL_PREDICATE = "https://data.iotics.com/app#model"
-SERIAL_NUMBER_PREDICATE = "https://data.iotics.com/tutorial#serialNumber"
-HOST_ALLOW_LIST_PREDICATE = "http://data.iotics.com/public#hostAllowList"
-INTERACTION_CONFIG_PREDICATE = "https://data.iotics.com/app#interactionConfig"
-
-INTERACTION_OBJECT = "https://data.iotics.com/app#Interaction"
-MODEL_OBJECT = "https://data.iotics.com/app#Model"
-ALL_HOSTS_OBJECT = "http://data.iotics.com/public#allHosts"
-TUTORIAL_SENSOR_OBJECT = "https://data.iotics.com/tutorial#Sensor"
-
 MODEL_TYPE_PROPERTY = {
     "key": TWIN_TYPE_PREDICATE,
-    "uriValue": {"value": MODEL_OBJECT},
+    "uriValue": {"value": "https://data.iotics.com/app#Model"},
 }
 ALLOW_ALL_HOSTS_PROPERTY = {
-    "key": HOST_ALLOW_LIST_PREDICATE,
-    "uriValue": {"value": ALL_HOSTS_OBJECT},
-}
-SENSOR_TYPE_PROPERTY = {
-    "key": TWIN_TYPE_PREDICATE,
-    "uriValue": {"value": TUTORIAL_SENSOR_OBJECT},
+    "key": "http://data.iotics.com/public#hostAllowList",
+    "uriValue": {"value": "http://data.iotics.com/public#allHosts"},
 }
 
 FEED_ID = "currentTemp"
 VALUE_LABEL = "temperature"
-
 OUTPUT_FEED_NAME = "temperature_status"
 OUTPUT_VALUE_LABEL = "status"
 
 SUBSCRIPTIONS_MAP = {}
 
 
+class RestApi(NamedTuple):
+    method: str
+    url: str
+
+
+SENSOR_DATA = RestApi(
+    method="GET",
+    url="http://flaskapi.dev.iotics.com/sensor_temp",
+)
+INDEX_PAGE = RestApi(
+    method="GET",
+    url="{host}/index.json",
+)
+
+CREATE_TWIN = RestApi(method="POST", url="{host}/qapi/twins")
+UPDATE_TWIN = RestApi(method="PATCH", url="{host}/qapi/twins/{twin_id}")
+CREATE_FEED = RestApi(method="POST", url="{host}/qapi/twins/{twin_id}/feeds")
+UPDATE_FEED = RestApi(
+    method="PATCH",
+    url="{host}/qapi/twins/{twin_id}/feeds/{feed_id}",
+)
+DESCRIBE_FEED = RestApi(
+    method="GET",
+    url="{host}/qapi/twins/{twin_id}/feeds/{feed_id}",
+)
+SHARE_DATA_FEED = RestApi(
+    method="POST",
+    url="{host}/qapi/twins/{twin_id}/feeds/{feed_id}/shares",
+)
+SUBSCRIBE_TO_FEED = RestApi(
+    method="GET",
+    url="/qapi/twins/{follower_twin_id}/interests/twins/{followed_twin_id}/feeds/{followed_feed_name}",
+)
+SEARCH_TWINS = RestApi(method="POST", url="{host}/qapi/searches")
+
+
 class Tutorial:
     def __init__(self):
+        self._api = get_rest_high_level_identity_api(resolver_url=RESOLVER_URL)
         self._client_app_id = f"randpub_{uuid4()}"
         self._client_ref = f"d-poc-{shortuuid.random(8)}"
         self._agent_registered_id = None
         self._user_registered_id = None
         self._headers = None
         self._sensors_map = {}
-        self._session = None
-        self._stomp_endpoint = None
 
     def setup(self):
         (
-            user_registered_id,
-            agent_registered_id,
-        ) = api.create_user_and_agent_with_auth_delegation(
+            self._user_registered_id,
+            self._agent_registered_id,
+        ) = self._api.create_user_and_agent_with_auth_delegation(
             user_seed=USER_SEED,
             user_key_name=USER_KEY_NAME,
             agent_seed=AGENT_SEED,
             agent_key_name=AGENT_KEY_NAME,
-            delegation_name=AUTH_DELEGATION_NAME,
+            delegation_name="#AuthDeleg",
         )
 
-        self._user_registered_id = user_registered_id
-        self._agent_registered_id = agent_registered_id
-        self._session = Session()
-        response = self._make_api_call(method="get", url=f"{HOST}/index.json")
-        index_json = json.loads(response.text)
-        self._stomp_endpoint = index_json["stomp"]
-        self._headers = get_headers(
-            self._user_registered_id,
-            self._agent_registered_id,
-            self._client_ref,
-            self._client_app_id,
+        self._headers = {
+            "accept": "application/json",
+            "Iotics-ClientRef": self._client_ref,
+            "Iotics-ClientAppId": self._client_app_id,
+            "Content-Type": "application/json",
+        }
+        self._refresh_token()
+
+    def _refresh_token(self):
+        token = self._api.create_agent_auth_token(
+            agent_registered_identity=self._agent_registered_id,
+            user_did=self._user_registered_id.did,
+            duration=3600,
         )
 
-    def _make_api_call(self, method, url, data=None, json=None):
-        headers = get_headers(
-            self._user_registered_id,
-            self._agent_registered_id,
-            self._client_ref,
-            self._client_app_id,
+        self._headers["Authorization"] = f"Bearer {token}"
+
+        return token
+
+    def get_sensor_data(self):
+        sensor_data = self._make_api_call(
+            method=SENSOR_DATA.method, url=SENSOR_DATA.url
         )
 
-        req = Request(
+        return sensor_data
+
+    def _make_api_call(self, method, url, json=None, retry=True):
+        response = request(
             method=method,
             url=url,
-            headers=headers,
-            data=data,
+            headers=self._headers,
             json=json,
         )
-
-        prep_req = req.prepare()
-        response = self._session.send(prep_req)
 
         try:
             response.raise_for_status()
         except Exception as ex:
-            print("An exception has occurred:", ex)
+            # It might be that the token has expired
+            if retry:
+                self._refresh_token()
+                self._make_api_call(method=method, url=url, json=None, retry=False)
+            else:
+                print(f"An exception has occurred when calling {url} API. {ex}")
 
-        return response
+        return response.json()
 
     def create_model(self):
         # Create Model twin
@@ -143,7 +147,7 @@ class Tutorial:
 
         # Add properties
         payload = {
-            "labels": {"added": [{"lang": "en", "value": "Machine model (test)"}]},
+            "labels": {"added": [{"lang": "en", "value": "Machine model (tutorial)"}]},
             "properties": {
                 "added": [MODEL_TYPE_PROPERTY, ALLOW_ALL_HOSTS_PROPERTY],
                 "clearedAll": True,
@@ -152,17 +156,17 @@ class Tutorial:
         }
 
         self._make_api_call(
-            method="patch",
-            url=f"{HOST}/qapi/twins/{model_twin_did}",
-            data=json.dumps(payload),
+            method=UPDATE_TWIN.method,
+            url=UPDATE_TWIN.url.format(host=HOST, twin_id=model_twin_did),
+            json=payload,
         )
 
         # Add Feed
         feed_payload = {"feedId": {"value": FEED_ID}, "storeLast": True}
 
         self._make_api_call(
-            method="post",
-            url=f"{HOST}/qapi/twins/{model_twin_did}/feeds",
+            method=CREATE_FEED.method,
+            url=CREATE_FEED.url.format(host=HOST, twin_id=model_twin_did),
             json=feed_payload,
         )
 
@@ -183,8 +187,10 @@ class Tutorial:
         }
 
         self._make_api_call(
-            method="patch",
-            url=f"{HOST}/qapi/twins/{model_twin_did}/feeds/{FEED_ID}",
+            method=UPDATE_FEED.method,
+            url=UPDATE_FEED.url.format(
+                host=HOST, twin_id=model_twin_did, feed_id=FEED_ID
+            ),
             json=payload,
         )
 
@@ -193,16 +199,16 @@ class Tutorial:
         return model_twin_did
 
     def _create_twin(self, twin_key_name):
-        twin_registered_id = api.create_twin_with_control_delegation(
+        twin_registered_id = self._api.create_twin_with_control_delegation(
             twin_seed=AGENT_SEED,
             twin_key_name=twin_key_name,
             agent_registered_identity=self._agent_registered_id,
-            delegation_name=CONTROL_DELEGATION_NAME,
+            delegation_name="#ControlDeleg",
         )
 
         self._make_api_call(
-            method="post",
-            url=f"{HOST}/qapi/twins",
+            method=CREATE_TWIN.method,
+            url=CREATE_TWIN.url.format(host=HOST),
             json={"twinId": {"value": twin_registered_id.did}},
         )
 
@@ -211,13 +217,10 @@ class Tutorial:
     def create_machine_from_model(self):
         twins_list = self._search_twins_by_properties([MODEL_TYPE_PROPERTY])
         model_twin = twins_list[0]
-        data = get_sensor_data()
 
-        counter = 0  # to remove
+        data = self.get_sensor_data()
 
         for machine_number, sensor_data in enumerate(data):
-            if counter > 2:
-                break
             machine_name = f"machine_{machine_number}"
             machine_twin_id = self._create_twin(twin_key_name=machine_name)
 
@@ -226,18 +229,23 @@ class Tutorial:
             payload = {
                 "location": {"location": {"lat": 51.5, "lon": -0.1}},
                 "labels": {
-                    "added": [{"lang": "en", "value": f"{machine_name} (test)"}]
+                    "added": [{"lang": "en", "value": f"{machine_name} (tutorial)"}]
                 },
                 "properties": {
                     "added": [
                         ALLOW_ALL_HOSTS_PROPERTY,
-                        SENSOR_TYPE_PROPERTY,
+                        {
+                            "key": TWIN_TYPE_PREDICATE,
+                            "uriValue": {
+                                "value": "https://data.iotics.com/tutorial#Sensor"
+                            },
+                        },
                         {
                             "key": CREATED_FROM_MODEL_PREDICATE,
                             "uriValue": {"value": model_twin_did},
                         },
                         {
-                            "key": SERIAL_NUMBER_PREDICATE,
+                            "key": "https://data.iotics.com/tutorial#serialNumber",
                             "stringLiteralValue": {"value": "%06d" % machine_number},
                         },
                     ],
@@ -247,9 +255,9 @@ class Tutorial:
             }
 
             self._make_api_call(
-                method="patch",
-                url=f"{HOST}/qapi/twins/{machine_twin_id}",
-                data=json.dumps(payload),
+                method=UPDATE_TWIN.method,
+                url=UPDATE_TWIN.url.format(host=HOST, twin_id=machine_twin_id),
+                json=payload,
             )
 
             # Add Feeds
@@ -263,18 +271,18 @@ class Tutorial:
                 }
 
                 self._make_api_call(
-                    method="post",
-                    url=f"{HOST}/qapi/twins/{machine_twin_id}/feeds",
+                    method=CREATE_FEED.method,
+                    url=CREATE_FEED.url.format(host=HOST, twin_id=machine_twin_id),
                     json=feed_payload,
                 )
 
                 # Describe feed
-                response = self._make_api_call(
-                    method="get",
-                    url=f"{HOST}/qapi/twins/{model_twin_did}/feeds/{feed_id}",
+                feed_description = self._make_api_call(
+                    method=DESCRIBE_FEED.method,
+                    url=DESCRIBE_FEED.url.format(
+                        host=HOST, twin_id=model_twin_did, feed_id=feed_id
+                    ),
                 )
-
-                feed_description = json.loads(response.text)
 
                 feed_label = feed_description["result"]["labels"][0]["value"]
                 feed_lang = feed_description["result"]["labels"][0]["lang"]
@@ -302,30 +310,35 @@ class Tutorial:
                     value_payload["values"]["added"].append(val)
 
                 self._make_api_call(
-                    method="patch",
-                    url=f"{HOST}/qapi/twins/{machine_twin_id}/feeds/{feed_id}",
+                    method=UPDATE_FEED.method,
+                    url=UPDATE_FEED.url.format(
+                        host=HOST, twin_id=machine_twin_id, feed_id=feed_id
+                    ),
                     json=value_payload,
                 )
 
-            data_to_share = {VALUE_LABEL: sensor_data["temp"]}
-            encoded_data = base64.b64encode(json.dumps(data_to_share).encode()).decode()
-            data_to_share_payload = {
-                "sample": {
-                    "data": encoded_data,
-                    "mime": "application/json",
-                    "occurredAt": datetime.now(tz=timezone.utc).isoformat(),
-                }
-            }
-
-            self._make_api_call(
-                method="post",
-                url=f"{HOST}/qapi/twins/{machine_twin_id}/feeds/{feed_id}/shares",
-                json=data_to_share_payload,
+            # Share first sample of data
+            self._share_data_api(
+                sensor_data=sensor_data,
+                twin_id=machine_twin_id,
+                feed_id=feed_id,
+                print_data=False,
             )
 
             self._sensors_map[machine_name] = machine_twin_id
             print("Machine twin created:", machine_name)
-            counter += 1
+
+    @staticmethod
+    def _follow_callback(headers, body):
+        payload = json.loads(body)
+        sub_id = headers["destination"].split("/")[3]
+        data = payload["feedData"]["data"]
+
+        sensor = SUBSCRIPTIONS_MAP[sub_id]
+        interaction_data = json.loads(base64.b64decode(data).decode("ascii"))
+
+        if interaction_data[OUTPUT_VALUE_LABEL] == "extreme":
+            print(f"{sensor}: SENSOR IS OVERHEATING! OH THE HUMANITY!!")
 
     def create_interaction(self, model_twin_did):
         # Create Interaction twin
@@ -375,17 +388,19 @@ class Tutorial:
 
         # Add properties
         payload = {
-            "labels": {"added": [{"lang": "en", "value": "Sensor Overheating Alert1"}]},
+            "labels": {"added": [{"lang": "en", "value": "Sensor Overheating Alert"}]},
             "properties": {
                 "added": [
                     MODEL_TYPE_PROPERTY,
                     ALLOW_ALL_HOSTS_PROPERTY,
                     {
                         "key": TWIN_TYPE_PREDICATE,
-                        "uriValue": {"value": INTERACTION_OBJECT},
+                        "uriValue": {
+                            "value": "https://data.iotics.com/app#Interaction"
+                        },
                     },
                     {
-                        "key": INTERACTION_CONFIG_PREDICATE,
+                        "key": "https://data.iotics.com/app#interactionConfig",
                         "stringLiteralValue": {"value": json.dumps(interaction_config)},
                     },
                 ],
@@ -394,16 +409,17 @@ class Tutorial:
             "newVisibility": {"visibility": "PUBLIC"},
         }
 
+        # Update properties
         self._make_api_call(
-            method="patch",
-            url=f"{HOST}/qapi/twins/{twin_did}",
-            data=json.dumps(payload),
+            method=UPDATE_TWIN.method,
+            url=UPDATE_TWIN.url.format(host=HOST, twin_id=twin_did),
+            json=payload,
         )
 
         # Add Feed
         self._make_api_call(
-            method="post",
-            url=f"{HOST}/qapi/twins/{twin_did}/feeds",
+            method=CREATE_FEED.method,
+            url=CREATE_FEED.url.format(host=HOST, twin_id=twin_did),
             json={"feedId": {"value": OUTPUT_FEED_NAME}, "storeLast": True},
         )
 
@@ -423,12 +439,36 @@ class Tutorial:
         }
 
         self._make_api_call(
-            method="patch",
-            url=f"{HOST}/qapi/twins/{twin_did}/feeds/{OUTPUT_FEED_NAME}",
+            method=UPDATE_FEED.method,
+            url=UPDATE_FEED.url.format(
+                host=HOST, twin_id=twin_did, feed_id=OUTPUT_FEED_NAME
+            ),
             json=payload,
         )
 
         return twin_did
+
+    def _share_data_api(
+        self, sensor_data, twin_id, feed_id, print_data=True, twin_label=None
+    ):
+        data_to_share = {VALUE_LABEL: sensor_data["temp"]}
+        encoded_data = base64.b64encode(json.dumps(data_to_share).encode()).decode()
+        data_to_share_payload = {
+            "sample": {
+                "data": encoded_data,
+                "mime": "application/json",
+                "occurredAt": datetime.now(tz=timezone.utc).isoformat(),
+            }
+        }
+
+        self._make_api_call(
+            method=SHARE_DATA_FEED.method,
+            url=SHARE_DATA_FEED.url.format(host=HOST, twin_id=twin_id, feed_id=feed_id),
+            json=data_to_share_payload,
+        )
+
+        if print_data:
+            print(f"Sharing data for {twin_label}: {data_to_share}")
 
     def share_data(self, data):
         for machine_number, sensor_data in enumerate(data):
@@ -436,22 +476,12 @@ class Tutorial:
             machine_twin_id = self._sensors_map.get(machine_name)
             if not machine_twin_id:
                 continue
-            data_to_share = {VALUE_LABEL: sensor_data["temp"]}
-            encoded_data = base64.b64encode(json.dumps(data_to_share).encode()).decode()
-            data_to_share_payload = {
-                "sample": {
-                    "data": encoded_data,
-                    "mime": "application/json",
-                    "occurredAt": datetime.now(tz=timezone.utc).isoformat(),
-                }
-            }
 
-            print("Sharing data for %s: %s" % (machine_name, data_to_share))
-
-            self._make_api_call(
-                method="post",
-                url=f"{HOST}/qapi/twins/{machine_twin_id}/feeds/{FEED_ID}/shares",
-                json=data_to_share_payload,
+            self._share_data_api(
+                sensor_data=sensor_data,
+                twin_id=machine_twin_id,
+                feed_id=FEED_ID,
+                twin_label=machine_name,
             )
 
     def _search_twins_by_properties(self, properties):
@@ -459,14 +489,15 @@ class Tutorial:
         self._headers.update({"Iotics-RequestTimeout": request_timeout.isoformat()})
 
         payload = {
-            "filter": {"properties": properties, "text": "test"},
+            "filter": {"properties": properties, "text": "tutorial"},
             "responseType": "FULL",
         }
 
         twins_list = []
 
-        with requests.post(
-            f"{HOST}/qapi/searches",
+        with request(
+            method="POST",
+            url=f"{HOST}/qapi/searches",
             headers=self._headers,
             json=payload,
             stream=True,
@@ -483,6 +514,7 @@ class Tutorial:
                 else:
                     break
 
+        self._headers.pop("Iotics-RequestTimeout")
         return twins_list
 
     def follow_sensors(self, interaction_twin_id):
@@ -506,10 +538,10 @@ class Tutorial:
 
         for sensor in output_twins:
             sensor_id = sensor["id"]["value"]
-            subscription_id = self._subscribe_to_feed(
-                sensor_id, sensor_id, OUTPUT_FEED_NAME, follow_callback
+            self._subscribe_to_feed(
+                sensor_id, sensor_id, OUTPUT_FEED_NAME, self._follow_callback
             )
-            SUBSCRIPTIONS_MAP[subscription_id] = sensor["label"]
+            SUBSCRIPTIONS_MAP[sensor_id] = sensor["label"]
 
     def _subscribe_to_feed(
         self,
@@ -518,12 +550,16 @@ class Tutorial:
         followed_feed_name,
         callback,
     ):
+        response = self._make_api_call(
+            method=INDEX_PAGE.method, url=INDEX_PAGE.url.format(host=HOST)
+        )
+
         feed_path = f"/qapi/twins/{follower_twin_id}/interests/twins/{followed_twin_id}/feeds/{followed_feed_name}"
 
         stomp_client = StompClient(
-            endpoint=self._stomp_endpoint,
+            endpoint=response["stomp"],
             callback=callback,
-            token=get_new_token(self._agent_registered_id, self._user_registered_id),
+            token=self._refresh_token(),
         )
         stomp_client.setup()
         stomp_client.subscribe(
@@ -532,33 +568,16 @@ class Tutorial:
             headers=self._headers,
         )
 
-        return follower_twin_id
-
 
 class StompClient:
-    def __init__(
-        self,
-        endpoint,
-        callback,
-        token,
-        reconnect_attempts_max=10,
-        heartbeats=(10000, 10000),
-    ):
+    def __init__(self, endpoint, callback, token):
         self._endpoint = endpoint
-        self._subscriptions = {}
-        self._reconnect_attempts_max = reconnect_attempts_max
         self._token = token
         self._stomp_client = None
-        self._heartbeats = heartbeats
         self._callback = callback
 
     def setup(self):
-        self._stomp_client = StompWSConnection12(
-            endpoint=self._endpoint,
-            heartbeats=self._heartbeats,
-            reconnect_attempts_max=self._reconnect_attempts_max,
-        )
-        self._stomp_client.set_ssl(verify=False)
+        self._stomp_client = StompWSConnection12(endpoint=self._endpoint)
         self._stomp_client.set_listener(
             "stomp_listener", StompListener(self._stomp_client, self._callback)
         )
@@ -590,52 +609,10 @@ class StompListener(stomp.ConnectionListener):
         print("disconnected")
 
 
-def follow_callback(headers, body):
-    payload = json.loads(body)
-    sub_id = headers["destination"].split("/")[3]
-    data = payload["feedData"]["data"]
-
-    sensor = SUBSCRIPTIONS_MAP[sub_id]
-    interaction_data = json.loads(base64.b64decode(data).decode("ascii"))
-
-    if interaction_data[OUTPUT_VALUE_LABEL] == "extreme":
-        print("%s: SENSOR IS OVERHEATING! OH THE HUMANITY!!" % sensor)
-
-
-def get_new_token(agent_registered_id, user_registered_id):
-    token = api.create_agent_auth_token(
-        agent_registered_identity=agent_registered_id,
-        user_did=user_registered_id.did,
-        duration=TOKEN_DURATION,
-    )
-
-    return token
-
-
-def get_headers(user_registered_id, agent_registered_id, client_ref, client_app_id):
-    token = get_new_token(agent_registered_id, user_registered_id)
-    headers = {
-        "accept": "application/json",
-        "Iotics-ClientRef": client_ref,
-        "Iotics-ClientAppId": client_app_id,
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
-    }
-
-    return headers
-
-
-def get_sensor_data():
-    response = requests.get("http://flaskapi.dev.iotics.com/sensor_temp")
-    if response.status_code > 400:
-        print("Error %s from API: %s" % (response.status_code, response.reason))
-
-    return response.json()
-
-
 def main():
     tutorial = Tutorial()
     tutorial.setup()
+
     model_twin_id = tutorial.create_model()
     tutorial.create_machine_from_model()
     interaction_twin_id = tutorial.create_interaction(model_twin_id)
@@ -643,7 +620,7 @@ def main():
 
     while True:
         print("\nGetting latest temperatures...")
-        data = get_sensor_data()
+        data = tutorial.get_sensor_data()
         tutorial.share_data(data)
 
         sleep(5)
