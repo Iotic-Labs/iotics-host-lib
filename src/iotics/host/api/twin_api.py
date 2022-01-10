@@ -1,9 +1,10 @@
 from uuid import uuid4
 
-from iotic.web.rest.client.qapi import ApiClient, CommentUpdate, CreateTwinRequestPayload, CreateTwinResponsePayload, \
-    DeleteTwinResponsePayload, DescribeTwinResponsePayload, GeoLocationUpdate, LabelUpdate, LangLiteral, \
-    ListAllTwinsResponsePayload, ModelProperty, PropertyUpdate, Tags, TwinApi as TwinClient, TwinID, \
-    UpdateTwinRequestPayload, UpdateTwinResponsePayload, Visibility, VisibilityUpdate
+from iotic.web.rest.client.qapi import ApiClient, CreateTwinRequestPayload, CreateTwinResponsePayload, \
+    DeleteTwinResponsePayload, DescribeTwinResponsePayload, GeoLocationUpdate, \
+    ListAllTwinsResponsePayload, ModelProperty, PropertyUpdate, TwinApi as TwinClient, TwinID, \
+    UpdateTwinRequestPayload, UpdateTwinResponsePayload, Visibility, VisibilityUpdate, GeoLocation, \
+    UpsertFeedWithMeta, UpsertTwinResponsePayload, UpsertTwinRequestPayload
 
 from iotics.host import metrics
 from iotics.host.api.utils import check_and_retry_with_new_token, fill_refs, ListOrTuple
@@ -30,12 +31,7 @@ class TwinApi:
             transaction_ref (str, optional): Used to loosely link requests/responses in a distributed env't. Max 36 char
 
 
-        Returns: CreateTwinResponsePayload, with structure as follows:
-            already_created (bool): Whether the feed existed before this request
-            twin (Twin):
-                id (TwinID): has sole attribute `value`, containing the twin's ID as a string
-                visibility (Visibility): Either PRIVATE (visible in a LOCAL scope), or PUBLIC (visible in any scope)
-
+        Returns: CreateTwinResponsePayload, whose sole attribute is the created twin `twin_id` object
         """
         payload = CreateTwinRequestPayload(twin_id=TwinID(value=twin_id))
         return self.rest_api_client.create_twin(
@@ -79,7 +75,7 @@ class TwinApi:
             client_ref (str, optional): to be deprecated, must be unique for each request
             transaction_ref (str, optional): Used to loosely link requests/responses in a distributed env't. Max 36 char
 
-        Returns: DeleteTwinResponsePayload, whose sole attribute `twin` has the deleted twin's id and visibility
+        Returns: DeleteTwinResponsePayload, whose sole attribute is the deleted twin `twin_id` object
 
         """
         return self.rest_api_client.delete_twin(
@@ -106,10 +102,6 @@ class TwinApi:
             remote_host_id (HostID): has attribute `value` containing a string identifying the host
             twin (Twin): has id and visibility attributes, as in other payloads
             result (TwinMetaResult):
-                comments (list[LangLiteral]): all the comments on the twin, max one per language. LangLiteral structure:
-                    lang (str): 2-character language code
-                    value (str): the text content of the comment
-                labels (list[LangLiteral]): all the labels on the twin, max one per language
                 location (GeoLocation) - The coordinates on Earth of the non-digital twin:
                     lat (float): Latitude
                     lon (float): Longitude
@@ -121,9 +113,7 @@ class TwinApi:
                         value (str): Content of the value as a string
                     string_literal_value (StringLiteral): Describes a string w/o language. One attribute, `value` (str)
                     uri_value (Uri): One attribute, `value`, a string representing a URI
-                tags (list[str]): Any tags that have been added to the twin
                 feeds (list[FeedMeta]): Each FeedMeta has attributes below:
-                    labels (list[LangLiteral]): as above in TwinMetaResult, or below in update_twin
                     store_last (bool): whether you can access the last data shared to this feed via the InterestApi
                     feed_id (FeedID): The id of the feed, whose string value is stored in a `value` attribute
 
@@ -153,10 +143,6 @@ class TwinApi:
             remote_host_id (HostID): has attribute `value` containing a string identifying the host
             twin (Twin): has id and visibility attributes, as in other payloads
             result (TwinMetaResult):
-                comments (list[LangLiteral]): all the comments on the twin, max one per language. LangLiteral structure:
-                    lang (str): 2-character language code
-                    value (str): the text content of the comment
-                labels (list[LangLiteral]): all the labels on the twin, max one per language
                 location (GeoLocation) - The coordinates on Earth of the non-digital twin:
                     lat (float): Latitude
                     lon (float): Longitude
@@ -168,9 +154,7 @@ class TwinApi:
                         value (str): Content of the value as a string
                     string_literal_value (StringLiteral): Describes a string w/o language. One attribute, `value` (str)
                     uri_value (Uri): One attribute, `value`, a string representing a URI
-                tags (list[str]): Any tags that have been added to the twin
                 feeds (list[FeedMeta]): Each FeedMeta has attributes below:
-                    labels (list[LangLiteral]): as above in TwinMetaResult, or below in update_twin
                     store_last (bool): whether you can access the last data shared to this feed via the InterestApi
                     feed_id (FeedID): The id of the feed, whose string value is stored in a `value` attribute
 
@@ -189,9 +173,6 @@ class TwinApi:
     def update_twin(  # pylint:disable=too-many-arguments,too-many-locals
             self, twin_id: str, client_ref: str = None, transaction_ref: str = None,
             new_visibility: Visibility = None, location: GeoLocationUpdate = None,
-            add_tags: ListOrTuple[str] = None, del_tags: ListOrTuple[str] = None,
-            add_labels: ListOrTuple[LangLiteral] = None, del_labels: ListOrTuple[str] = None,
-            add_comments: ListOrTuple[LangLiteral] = None, del_comments: ListOrTuple[str] = None,
             add_props: ListOrTuple[ModelProperty] = None, del_props: ListOrTuple[ModelProperty] = None,
             del_props_by_key: ListOrTuple[str] = None, clear_all_props: bool = False
     ) -> UpdateTwinResponsePayload:
@@ -205,14 +186,6 @@ class TwinApi:
                 in any scope)
             location (GeoLocationUpdate, optional): Where on earth (lat/lon) the non-digital twin is located
                 e.g. GeoLocationUpdate(location=GeoLocation(lat=10, lon=10))
-            add_tags: (list/tuple[str], optional): List of tags to be added
-            del_tags: (list/tuple[str], optional): List of tags to be deleted
-            add_labels (list/tuple[LangLiteral], optional): List of labels to be added. Only one label per language is
-                stored, i.e. any existing ones with the same language will be replaced
-            del_labels (list/tuple[str], optional): List of languages for which languages should be removed
-            add_comments (list/tuple[LangLiteral], optional): List of comments to be added. Same language caveat as for
-                labels.
-            del_comments: (list/tuple[str], optional): List of languages for which comments should be deleted
             add_props: (list/tuple[ModelProperty], optional): List of semantic properties to be added to the twin. Each
                 property has a key (string, corresponding to the property's predicate), and one of several value types
                 corresponding to the property's object: LangLiteral, StringLiteral, Literal, or Uri
@@ -221,15 +194,12 @@ class TwinApi:
                 will be deleted from the twin
             clear_all_props (bool, optional): Whether to remove all non-internal properties. Defaults to False
 
-        Returns: UpdateTwinResponsePayload, whose sole attribute `twin` has the deleted twin's id and visibility
+        Returns: UpdateTwinResponsePayload, whose sole attribute is the updated twin `twin_id` object
 
         """
         payload = UpdateTwinRequestPayload(
             new_visibility=VisibilityUpdate(visibility=new_visibility) if new_visibility else None,
             location=location or None,
-            labels=LabelUpdate(added=add_labels, deleted_by_lang=del_labels),
-            comments=CommentUpdate(added=add_comments, deleted_by_lang=del_comments),
-            tags=Tags(added=add_tags, deleted=del_tags),
             properties=PropertyUpdate(
                 added=add_props, deleted=del_props, cleared_all=clear_all_props, deleted_by_key=del_props_by_key
             )
@@ -241,6 +211,44 @@ class TwinApi:
             iotics_client_ref=client_ref,
             iotics_transaction_ref=transaction_ref
         )
+
+    @metrics.add()
+    @check_and_retry_with_new_token
+    @fill_refs
+    def upsert_twin(
+            self, twin_id: str, client_ref: str = None, transaction_ref: str = None,
+            visibility: Visibility = None, location: GeoLocation = None,
+            properties: ListOrTuple[ModelProperty] = None, feeds: ListOrTuple[UpsertFeedWithMeta] = None
+    ) -> UpsertTwinResponsePayload:
+        """Upsert creates or update a twin with its metadata + the twin's feeds with their metadata.
+        The full state is applied (ie. if the operation succeeds the state of the twin/feeds will be the one
+        described in the payload) the metadata describing a twin.
+
+        Args:
+            twin_id (str): ID of the twin to update
+            client_ref (str, optional): to be deprecated, must be unique for each request
+            transaction_ref (str, optional): Used to loosely link requests/responses in a distributed env't. Max 36 char
+            visibility (Visibility, optional): Can either be PRIVATE (visible in a LOCAL scope), or PUBLIC (visible
+                in any scope). Will be defaulted to PRIVATE if not set.
+            location (GeoLocation, optional): Where on earth (lat/lon) the non-digital twin is located
+                e.g. GeoLocation(lat=10, lon=10)
+            properties: (list/tuple[ModelProperty], optional): List of semantic properties to set to the twin. Each
+                property has a key (string, corresponding to the property's predicate), and one of several value types
+                corresponding to the property's object: LangLiteral, StringLiteral, Literal, or Uri
+            feed: (list/tuple[UpsertFeedWithMeta], optional): the description of the twin's feed
+
+        Returns: UpsertTwinResponsePayload, whose sole attribute is the upserted `twin_id` string
+
+        """
+        payload = UpsertTwinRequestPayload(twin_id=twin_id,
+                                           location=location,
+                                           properties=properties,
+                                           visibility=visibility,
+                                           feeds=feeds)
+        return self.rest_api_client.upsert_twin(iotics_client_app_id=self.client_app_id,
+                                                iotics_client_ref=client_ref,
+                                                iotics_transaction_ref=transaction_ref,
+                                                body=payload)
 
 
 def get_twin_api(config, app_id: str = None, agent_auth: AgentAuth = None) -> TwinApi:

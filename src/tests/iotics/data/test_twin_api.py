@@ -2,11 +2,12 @@ from functools import partial
 
 import pytest
 from iotic.web.rest.client.qapi import ApiException, ApiValueError, Configuration, GeoLocation, GeoLocationUpdate, \
-    LangLiteral, Literal, ModelProperty, StringLiteral, TwinApi as TwinClient, Uri, Visibility
-
+    LangLiteral, Literal, ModelProperty, StringLiteral, TwinApi as TwinClient, UpsertFeedWithMeta, Uri, Value, \
+    Visibility
 from iotics.host.api.qapi import QApiFactory
 from iotics.host.api.twin_api import get_twin_api, TwinApi
 from iotics.host.exceptions import DataSourcesQApiError, DataSourcesQApiHttpError
+
 from tests.iotics.data.mocks import AgentAuthTest, ConfTest, FakeApiClient, get_api_exception
 
 
@@ -35,7 +36,8 @@ def get_test_twin_api():
 
 @pytest.mark.parametrize('client_call', (get_test_twin_api().delete_twin,
                                          get_test_twin_api().describe_twin,
-                                         partial(get_test_twin_api().describe_remote_twin, remote_host_id='a remote host id'),  # noqa: E501 pylint: disable=C0301
+                                         partial(get_test_twin_api().describe_remote_twin,
+                                                 remote_host_id='a remote host id'),  # noqa: E501 pylint: disable=C0301
                                          partial(get_test_twin_api().update_twin, ),
                                          ))
 def test_should_raise_if_client_check_fails(client_call):
@@ -72,12 +74,6 @@ def get_update_twin_call():
     return partial(get_test_twin_api().update_twin, twin_id='a twin id',
                    new_visibility=Visibility.PUBLIC,
                    location=GeoLocationUpdate(location=GeoLocation(lat=0.3455, lon=1.234)),
-                   add_labels=(LangLiteral(lang='fr', value='un label'),),
-                   del_labels=('a label',),
-                   add_comments=(LangLiteral(lang='fr', value='un commentaire'),),
-                   del_comments=('a comment',),
-                   add_tags=('tag1', 'tag2'),
-                   del_tags=('tag3',),
                    add_props=(ModelProperty(key='key1', lang_literal_value=LangLiteral(lang='fr', value='une valeur')),
                               ModelProperty(key='key2', literal_value=Literal(data_type='data type', value='a value'))),
                    del_props=(ModelProperty(key='key3', string_literal_value=StringLiteral(value='a value')),
@@ -86,12 +82,28 @@ def get_update_twin_call():
                    clear_all_props=True)
 
 
+def get_upsert_twin_call():
+    props = (ModelProperty(key='key1', lang_literal_value=LangLiteral(lang='fr', value='une valeur')),
+             ModelProperty(key='key2', literal_value=Literal(data_type='data type', value='a value')))
+    return partial(get_test_twin_api().upsert_twin, twin_id='a twin id',
+                   visibility=Visibility.PUBLIC,
+                   location=GeoLocation(lat=0.3455, lon=1.234),
+                   properties=props,
+                   feeds=(UpsertFeedWithMeta(
+                       id='a feed',
+                       properties=props,
+                       store_last=True,
+                       values=(Value(comment='a comment', data_type='a data type', label='a label', unit='a unit'),)
+                   )))
+
+
 @pytest.mark.parametrize('client_call', (get_create_twin_call(),
                                          get_list_twins_call(),
                                          get_delete_twin_call(),
                                          get_describe_twin_call(),
                                          get_describe_remote_twin_call(),
                                          get_update_twin_call(),
+                                         get_upsert_twin_call(),
                                          ))
 def test_client_validation_is_ok_should_raise_connection_error(client_call, twin_id, feed_id):
     """

@@ -25,7 +25,7 @@ class DataSourcesQApiHttpError(DataSourcesQApiError):
     """
 
     def __init__(self, http_error: ApiException):
-        super().__init__()
+        super().__init__(http_error.reason)
         self.http_error = http_error
 
 
