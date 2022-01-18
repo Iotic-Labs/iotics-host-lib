@@ -18,6 +18,8 @@ AGENT_KEY_NAME = "<from script output>"
 USER_SEED = bytes.fromhex("<from script output>")
 AGENT_SEED = bytes.fromhex("<from script output>")
 
+TWINS_VISIBILITY = "PRIVATE"
+
 TWIN_TYPE_PREDICATE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
 CREATED_FROM_MODEL_PREDICATE = "https://data.iotics.com/app#model"
 MODEL_TYPE_PROPERTY = {
@@ -53,6 +55,7 @@ INDEX_PAGE = RestApi(
 
 CREATE_TWIN = RestApi(method="POST", url="{host}/qapi/twins")
 UPDATE_TWIN = RestApi(method="PATCH", url="{host}/qapi/twins/{twin_id}")
+UPSERT_TWIN = RestApi(method="PUT", url="{host}/qapi/twins")
 CREATE_FEED = RestApi(method="POST", url="{host}/qapi/twins/{twin_id}/feeds")
 UPDATE_FEED = RestApi(
     method="PATCH",
@@ -114,13 +117,6 @@ class Tutorial:
 
         return token
 
-    def get_sensor_data(self):
-        sensor_data = self._make_api_call(
-            method=SENSOR_DATA.method, url=SENSOR_DATA.url
-        )
-
-        return sensor_data
-
     def _make_api_call(self, method, url, json=None, retry=True):
         response = request(
             method=method,
@@ -137,66 +133,11 @@ class Tutorial:
                 self._refresh_token()
                 self._make_api_call(method=method, url=url, json=None, retry=False)
             else:
-                print(f"An exception has occurred when calling {url} API. {ex}")
+                print(
+                    f"An exception has occurred when calling {url} with json {json} API. {ex}"
+                )
 
         return response.json()
-
-    def create_model(self):
-        # Create Model twin
-        model_twin_did = self._create_twin(twin_key_name="#MachineModel")
-
-        # Add properties
-        payload = {
-            "labels": {"added": [{"lang": "en", "value": "Machine model (tutorial)"}]},
-            "properties": {
-                "added": [MODEL_TYPE_PROPERTY, ALLOW_ALL_HOSTS_PROPERTY],
-                "clearedAll": True,
-            },
-            "newVisibility": {"visibility": "PUBLIC"},
-        }
-
-        self._make_api_call(
-            method=UPDATE_TWIN.method,
-            url=UPDATE_TWIN.url.format(host=HOST, twin_id=model_twin_did),
-            json=payload,
-        )
-
-        # Add Feed
-        feed_payload = {"feedId": {"value": FEED_ID}, "storeLast": True}
-
-        self._make_api_call(
-            method=CREATE_FEED.method,
-            url=CREATE_FEED.url.format(host=HOST, twin_id=model_twin_did),
-            json=feed_payload,
-        )
-
-        # Add Value
-        payload = {
-            "storeLast": True,
-            "labels": {"added": [{"lang": "en", "value": FEED_ID}]},
-            "values": {
-                "added": [
-                    {
-                        "comment": "Temperature in degrees Celsius",
-                        "dataType": "decimal",
-                        "label": VALUE_LABEL,
-                        "unit": "http://purl.obolibrary.org/obo/UO_0000027",
-                    }
-                ]
-            },
-        }
-
-        self._make_api_call(
-            method=UPDATE_FEED.method,
-            url=UPDATE_FEED.url.format(
-                host=HOST, twin_id=model_twin_did, feed_id=FEED_ID
-            ),
-            json=payload,
-        )
-
-        print("Model twin created")
-
-        return model_twin_did
 
     def _create_twin(self, twin_key_name):
         twin_registered_id = self._api.create_twin_with_control_delegation(
@@ -214,119 +155,182 @@ class Tutorial:
 
         return twin_registered_id.did
 
-    def create_machine_from_model(self):
-        twins_list = self._search_twins_by_properties([MODEL_TYPE_PROPERTY])
-        model_twin = twins_list[0]
+    def _upsert_twin(
+        self,
+        twin_id,
+        visibility,
+        feeds,
+        labels,
+        location=None,
+        properties=None,
+        cleared_all=True,
+    ):
+        payload = {
+            "twinId": twin_id,
+            "labels": labels,
+            "visibility": visibility,
+        }
 
-        data = self.get_sensor_data()
+        if location:
+            payload["location"] = location
+        if feeds:
+            payload["feeds"] = feeds
+        if properties:
+            payload["properties"] = properties
 
-        for machine_number, sensor_data in enumerate(data):
-            machine_name = f"machine_{machine_number}"
-            machine_twin_id = self._create_twin(twin_key_name=machine_name)
+        self._make_api_call(
+            method=UPSERT_TWIN.method,
+            url=UPSERT_TWIN.url.format(host=HOST),
+            json=payload,
+        )
 
-            # Add properties
-            model_twin_did = model_twin["id"]["value"]
-            payload = {
-                "location": {"location": {"lat": 51.5, "lon": -0.1}},
-                "labels": {
-                    "added": [{"lang": "en", "value": f"{machine_name} (tutorial)"}]
-                },
-                "properties": {
-                    "added": [
-                        ALLOW_ALL_HOSTS_PROPERTY,
-                        {
-                            "key": TWIN_TYPE_PREDICATE,
-                            "uriValue": {
-                                "value": "https://data.iotics.com/tutorial#Sensor"
-                            },
-                        },
-                        {
-                            "key": CREATED_FROM_MODEL_PREDICATE,
-                            "uriValue": {"value": model_twin_did},
-                        },
-                        {
-                            "key": "https://data.iotics.com/tutorial#serialNumber",
-                            "stringLiteralValue": {"value": "%06d" % machine_number},
-                        },
-                    ],
-                    "clearedAll": True,
-                },
-                "newVisibility": {"visibility": "PUBLIC"},
+    def _update_twin_with_metadata(
+        self,
+        twin_id,
+        labels,
+        visibility,
+        properties=None,
+        cleared_all=True,
+        location=None,
+    ):
+        payload = {
+            "labels": {"added": labels},
+            "newVisibility": {"visibility": visibility},
+        }
+
+        if properties:
+            payload.update(
+                {
+                    "properties": {"added": properties, "clearedAll": cleared_all},
+                }
+            )
+        if location:
+            payload["location"] = location
+
+        self._make_api_call(
+            method=UPDATE_TWIN.method,
+            url=UPDATE_TWIN.url.format(host=HOST, twin_id=twin_id),
+            json=payload,
+        )
+
+    def _create_feed(self, twin_id, feed_id, feed_store_last):
+        self._make_api_call(
+            method=CREATE_FEED.method,
+            url=CREATE_FEED.url.format(host=HOST, twin_id=twin_id),
+            json={
+                "feedId": {"value": feed_id},
+                "storeLast": feed_store_last,
+            },
+        )
+
+    def _describe_feed(self, twin_id, feed_id):
+        feed_description = self._make_api_call(
+            method=DESCRIBE_FEED.method,
+            url=DESCRIBE_FEED.url.format(host=HOST, twin_id=twin_id, feed_id=feed_id),
+        )
+
+        return feed_description
+
+    def _create_value(self, twin_id, feed_id, labels, metadata, store_last):
+        payload = {
+            "storeLast": store_last,
+            "labels": {"added": labels},
+            "values": {"added": metadata},
+        }
+
+        self._make_api_call(
+            method=UPDATE_FEED.method,
+            url=UPDATE_FEED.url.format(host=HOST, twin_id=twin_id, feed_id=feed_id),
+            json=payload,
+        )
+
+    def _search_twins(self, properties=None, text=None, location=None, scope="LOCAL"):
+        request_timeout = datetime.now(tz=timezone.utc) + timedelta(seconds=10)
+        self._headers.update({"Iotics-RequestTimeout": request_timeout.isoformat()})
+
+        payload = {
+            "filter": {},
+            "responseType": "FULL",
+        }
+
+        if properties:
+            payload["filter"]["properties"] = properties
+        if text:
+            payload["filter"]["text"] = text
+        if location:
+            payload["filter"]["location"] = location
+
+        twins_list = []
+
+        with request(
+            method=SEARCH_TWINS.method,
+            url=SEARCH_TWINS.url.format(host=HOST),
+            headers=self._headers,
+            json=payload,
+            stream=True,
+            verify=False,
+            params={"scope": scope},
+        ) as resp:
+            resp.raise_for_status()
+
+            for chunk in resp.iter_lines():
+                response = json.loads(chunk)
+                try:
+                    twins_list = response["result"]["payload"]["twins"]
+                except (KeyError, IndexError):
+                    continue
+                else:
+                    break
+
+        self._headers.pop("Iotics-RequestTimeout")
+        return twins_list
+
+    def _publish_feed_value(
+        self, sensor_data, twin_id, feed_id, print_data=True, twin_label=None
+    ):
+        data_to_share = {VALUE_LABEL: sensor_data["temp"]}
+        encoded_data = base64.b64encode(json.dumps(data_to_share).encode()).decode()
+        data_to_share_payload = {
+            "sample": {
+                "data": encoded_data,
+                "mime": "application/json",
+                "occurredAt": datetime.now(tz=timezone.utc).isoformat(),
             }
+        }
 
-            self._make_api_call(
-                method=UPDATE_TWIN.method,
-                url=UPDATE_TWIN.url.format(host=HOST, twin_id=machine_twin_id),
-                json=payload,
-            )
+        self._make_api_call(
+            method=SHARE_DATA_FEED.method,
+            url=SHARE_DATA_FEED.url.format(host=HOST, twin_id=twin_id, feed_id=feed_id),
+            json=data_to_share_payload,
+        )
 
-            # Add Feeds
-            for feed in model_twin["feeds"]:
-                feed_id = feed["feed"]["id"]["value"]
-                feed_store_last = feed["storeLast"]
+        if print_data:
+            print(f"Sharing data for {twin_label}: {data_to_share}")
 
-                feed_payload = {
-                    "feedId": {"value": feed_id},
-                    "storeLast": feed_store_last,
-                }
+    def _subscribe_to_feed(
+        self,
+        follower_twin_id,
+        followed_twin_id,
+        followed_feed_name,
+        callback,
+    ):
+        response = self._make_api_call(
+            method=INDEX_PAGE.method, url=INDEX_PAGE.url.format(host=HOST)
+        )
 
-                self._make_api_call(
-                    method=CREATE_FEED.method,
-                    url=CREATE_FEED.url.format(host=HOST, twin_id=machine_twin_id),
-                    json=feed_payload,
-                )
+        feed_path = f"/qapi/twins/{follower_twin_id}/interests/twins/{followed_twin_id}/feeds/{followed_feed_name}"
 
-                # Describe feed
-                feed_description = self._make_api_call(
-                    method=DESCRIBE_FEED.method,
-                    url=DESCRIBE_FEED.url.format(
-                        host=HOST, twin_id=model_twin_did, feed_id=feed_id
-                    ),
-                )
-
-                feed_label = feed_description["result"]["labels"][0]["value"]
-                feed_lang = feed_description["result"]["labels"][0]["lang"]
-                feed_values = feed_description["result"]["values"]
-
-                # Add Value
-                value_payload = {
-                    "storeLast": feed_store_last,
-                    "labels": {"added": [{"lang": feed_lang, "value": feed_label}]},
-                    "values": {"added": []},
-                }
-
-                for value in feed_values:
-                    value_comment = value["comment"]
-                    value_label = value["label"]
-                    value_unit = value["unit"]
-                    value_datatype = value["dataType"]
-
-                    val = {
-                        "comment": value_comment,
-                        "dataType": value_datatype,
-                        "label": value_label,
-                        "unit": value_unit,
-                    }
-                    value_payload["values"]["added"].append(val)
-
-                self._make_api_call(
-                    method=UPDATE_FEED.method,
-                    url=UPDATE_FEED.url.format(
-                        host=HOST, twin_id=machine_twin_id, feed_id=feed_id
-                    ),
-                    json=value_payload,
-                )
-
-            # Share first sample of data
-            self._share_data_api(
-                sensor_data=sensor_data,
-                twin_id=machine_twin_id,
-                feed_id=feed_id,
-                print_data=False,
-            )
-
-            self._sensors_map[machine_name] = machine_twin_id
-            print("Machine twin created:", machine_name)
+        stomp_client = StompClient(
+            endpoint=response["stomp"],
+            callback=callback,
+            token=self._refresh_token(),
+        )
+        stomp_client.setup()
+        stomp_client.subscribe(
+            destination=feed_path,
+            subscription_id=self._headers["Iotics-ClientRef"],
+            headers=self._headers,
+        )
 
     @staticmethod
     def _follow_callback(headers, body):
@@ -340,11 +344,141 @@ class Tutorial:
         if interaction_data[OUTPUT_VALUE_LABEL] == "extreme":
             print(f"{sensor}: SENSOR IS OVERHEATING! OH THE HUMANITY!!")
 
+    def create_model(self):
+        # Create Model twin
+        model_twin_did = self._create_twin(twin_key_name="#MachineModel")
+
+        # Add Properties
+        self._update_twin_with_metadata(
+            twin_id=model_twin_did,
+            labels=[{"lang": "en", "value": "Machine model (tutorial)"}],
+            properties=[MODEL_TYPE_PROPERTY, ALLOW_ALL_HOSTS_PROPERTY],
+            visibility=TWINS_VISIBILITY,
+        )
+
+        # Add Feed
+        self._create_feed(twin_id=model_twin_did, feed_id=FEED_ID, feed_store_last=True)
+
+        # Add Value
+        self._create_value(
+            twin_id=model_twin_did,
+            feed_id=FEED_ID,
+            labels=[{"lang": "en", "value": FEED_ID}],
+            metadata=[
+                {
+                    "comment": "Temperature in degrees Celsius",
+                    "dataType": "decimal",
+                    "label": VALUE_LABEL,
+                    "unit": "http://purl.obolibrary.org/obo/UO_0000027",
+                }
+            ],
+            store_last=True,
+        )
+
+        print("Model twin created")
+
+        return model_twin_did
+
+    def create_machine_from_model(self):
+        # Search for Machine Model
+        twins_list = self._search_twins(
+            properties=[MODEL_TYPE_PROPERTY], text="Machine model (tutorial)"
+        )
+        model_twin = twins_list[0]
+
+        data = self.get_sensor_data()
+
+        for machine_number, sensor_data in enumerate(data):
+            machine_name = f"machine_{machine_number}"
+            machine_twin_id = self._create_twin(twin_key_name=machine_name)
+
+            # Add properties
+            model_twin_did = model_twin["id"]["value"]
+            self._update_twin_with_metadata(
+                twin_id=machine_twin_id,
+                labels=[{"lang": "en", "value": f"{machine_name} (tutorial)"}],
+                properties=[
+                    ALLOW_ALL_HOSTS_PROPERTY,
+                    {
+                        "key": TWIN_TYPE_PREDICATE,
+                        "uriValue": {
+                            "value": "https://data.iotics.com/tutorial#Sensor"
+                        },
+                    },
+                    {
+                        "key": CREATED_FROM_MODEL_PREDICATE,
+                        "uriValue": {"value": model_twin_did},
+                    },
+                    {
+                        "key": "https://data.iotics.com/tutorial#serialNumber",
+                        "stringLiteralValue": {"value": "%06d" % machine_number},
+                    },
+                ],
+                location={"location": {"lat": 51.5, "lon": -0.1}},
+                visibility=TWINS_VISIBILITY,
+            )
+
+            # Add Feeds
+            for feed in model_twin["feeds"]:
+                feed_id = feed["feed"]["id"]["value"]
+                feed_store_last = feed["storeLast"]
+
+                self._create_feed(
+                    twin_id=machine_twin_id,
+                    feed_id=feed_id,
+                    feed_store_last=feed_store_last,
+                )
+
+                # Describe feed
+                feed_description = self._describe_feed(
+                    twin_id=model_twin_did, feed_id=feed_id
+                )
+
+                feed_label = feed_description["result"]["labels"][0]["value"]
+                feed_lang = feed_description["result"]["labels"][0]["lang"]
+                feed_values = feed_description["result"]["values"]
+
+                # Add Value(s)
+                values_metadata = []
+
+                for value in feed_values:
+                    value_comment = value["comment"]
+                    value_label = value["label"]
+                    value_unit = value["unit"]
+                    value_datatype = value["dataType"]
+
+                    metadata = {
+                        "comment": value_comment,
+                        "dataType": value_datatype,
+                        "label": value_label,
+                        "unit": value_unit,
+                    }
+                    values_metadata.append(metadata)
+
+                self._create_value(
+                    twin_id=machine_twin_id,
+                    feed_id=feed_id,
+                    labels=[{"lang": feed_lang, "value": feed_label}],
+                    metadata=values_metadata,
+                    store_last=True,
+                )
+
+            # Share first sample of data
+            self._publish_feed_value(
+                sensor_data=sensor_data,
+                twin_id=machine_twin_id,
+                feed_id=feed_id,
+                print_data=False,
+            )
+
+            self._sensors_map[machine_name] = machine_twin_id
+            print("Machine twin created:", machine_name)
+
     def create_interaction(self, model_twin_did):
         # Create Interaction twin
         twin_did = self._create_twin(twin_key_name="#SensorInteraction")
 
-        print("INTERACTION TWIN created")
+        print("Interaction Twin created")
 
         interaction_config = {
             "enabled": True,
@@ -354,7 +488,7 @@ class Tutorial:
                         "conditions": [
                             {
                                 "fieldsIncludedInOutput": [VALUE_LABEL],
-                                "jsonLogic": {">": [{"var": VALUE_LABEL}, 25]},
+                                "jsonLogic": {">": [{"var": VALUE_LABEL}, 30]},
                             }
                         ],
                         "outputFeedId": OUTPUT_FEED_NAME,
@@ -387,88 +521,45 @@ class Tutorial:
         }
 
         # Add properties
-        payload = {
-            "labels": {"added": [{"lang": "en", "value": "Sensor Overheating Alert"}]},
-            "properties": {
-                "added": [
-                    MODEL_TYPE_PROPERTY,
-                    ALLOW_ALL_HOSTS_PROPERTY,
-                    {
-                        "key": TWIN_TYPE_PREDICATE,
-                        "uriValue": {
-                            "value": "https://data.iotics.com/app#Interaction"
-                        },
-                    },
-                    {
-                        "key": "https://data.iotics.com/app#interactionConfig",
-                        "stringLiteralValue": {"value": json.dumps(interaction_config)},
-                    },
-                ],
-                "clearedAll": True,
-            },
-            "newVisibility": {"visibility": "PUBLIC"},
-        }
-
-        # Update properties
-        self._make_api_call(
-            method=UPDATE_TWIN.method,
-            url=UPDATE_TWIN.url.format(host=HOST, twin_id=twin_did),
-            json=payload,
+        self._update_twin_with_metadata(
+            twin_id=twin_did,
+            labels=[{"lang": "en", "value": "Sensor Overheating Alert"}],
+            visibility=TWINS_VISIBILITY,
+            properties=[
+                MODEL_TYPE_PROPERTY,
+                ALLOW_ALL_HOSTS_PROPERTY,
+                {
+                    "key": TWIN_TYPE_PREDICATE,
+                    "uriValue": {"value": "https://data.iotics.com/app#Interaction"},
+                },
+                {
+                    "key": "https://data.iotics.com/app#interactionConfig",
+                    "stringLiteralValue": {"value": json.dumps(interaction_config)},
+                },
+            ],
         )
 
         # Add Feed
-        self._make_api_call(
-            method=CREATE_FEED.method,
-            url=CREATE_FEED.url.format(host=HOST, twin_id=twin_did),
-            json={"feedId": {"value": OUTPUT_FEED_NAME}, "storeLast": True},
+        self._create_feed(
+            twin_id=twin_did, feed_id=OUTPUT_FEED_NAME, feed_store_last=True
         )
 
         # Add Value
-        payload = {
-            "storeLast": True,
-            "labels": {"added": [{"lang": "en", "value": "Temperature status"}]},
-            "values": {
-                "added": [
-                    {
-                        "comment": "Temperature status: normal or extreme",
-                        "dataType": "string",
-                        "label": OUTPUT_VALUE_LABEL,
-                    }
-                ]
-            },
-        }
-
-        self._make_api_call(
-            method=UPDATE_FEED.method,
-            url=UPDATE_FEED.url.format(
-                host=HOST, twin_id=twin_did, feed_id=OUTPUT_FEED_NAME
-            ),
-            json=payload,
+        self._create_value(
+            twin_id=twin_did,
+            feed_id=OUTPUT_FEED_NAME,
+            labels=[{"lang": "en", "value": "Temperature status"}],
+            metadata=[
+                {
+                    "comment": "Temperature status: normal or extreme",
+                    "dataType": "string",
+                    "label": OUTPUT_VALUE_LABEL,
+                }
+            ],
+            store_last=True,
         )
 
         return twin_did
-
-    def _share_data_api(
-        self, sensor_data, twin_id, feed_id, print_data=True, twin_label=None
-    ):
-        data_to_share = {VALUE_LABEL: sensor_data["temp"]}
-        encoded_data = base64.b64encode(json.dumps(data_to_share).encode()).decode()
-        data_to_share_payload = {
-            "sample": {
-                "data": encoded_data,
-                "mime": "application/json",
-                "occurredAt": datetime.now(tz=timezone.utc).isoformat(),
-            }
-        }
-
-        self._make_api_call(
-            method=SHARE_DATA_FEED.method,
-            url=SHARE_DATA_FEED.url.format(host=HOST, twin_id=twin_id, feed_id=feed_id),
-            json=data_to_share_payload,
-        )
-
-        if print_data:
-            print(f"Sharing data for {twin_label}: {data_to_share}")
 
     def share_data(self, data):
         for machine_number, sensor_data in enumerate(data):
@@ -477,45 +568,12 @@ class Tutorial:
             if not machine_twin_id:
                 continue
 
-            self._share_data_api(
+            self._publish_feed_value(
                 sensor_data=sensor_data,
                 twin_id=machine_twin_id,
                 feed_id=FEED_ID,
                 twin_label=machine_name,
             )
-
-    def _search_twins_by_properties(self, properties):
-        request_timeout = datetime.now(tz=timezone.utc) + timedelta(seconds=10)
-        self._headers.update({"Iotics-RequestTimeout": request_timeout.isoformat()})
-
-        payload = {
-            "filter": {"properties": properties, "text": "tutorial"},
-            "responseType": "FULL",
-        }
-
-        twins_list = []
-
-        with request(
-            method="POST",
-            url=f"{HOST}/qapi/searches",
-            headers=self._headers,
-            json=payload,
-            stream=True,
-            verify=False,
-            params={"scope": "LOCAL"},
-        ) as resp:
-            resp.raise_for_status()
-            for chunk in resp.iter_lines():
-                response = json.loads(chunk)
-                try:
-                    twins_list = response["result"]["payload"]["twins"]
-                except (KeyError, IndexError):
-                    continue
-                else:
-                    break
-
-        self._headers.pop("Iotics-RequestTimeout")
-        return twins_list
 
     def follow_sensors(self, interaction_twin_id):
         output_twins = []
@@ -523,13 +581,13 @@ class Tutorial:
         print("Searching for output twins", end="", flush=True)
 
         while len(output_twins) < len(self._sensors_map):
-            output_twins = self._search_twins_by_properties(
+            output_twins = self._search_twins(
                 properties=[
                     {
                         "key": CREATED_FROM_MODEL_PREDICATE,
                         "uriValue": {"value": interaction_twin_id},
                     }
-                ]
+                ],
             )
             sleep(10)
             print(".", end="", flush=True)
@@ -543,30 +601,12 @@ class Tutorial:
             )
             SUBSCRIPTIONS_MAP[sensor_id] = sensor["label"]
 
-    def _subscribe_to_feed(
-        self,
-        follower_twin_id,
-        followed_twin_id,
-        followed_feed_name,
-        callback,
-    ):
-        response = self._make_api_call(
-            method=INDEX_PAGE.method, url=INDEX_PAGE.url.format(host=HOST)
+    def get_sensor_data(self):
+        sensor_data = self._make_api_call(
+            method=SENSOR_DATA.method, url=SENSOR_DATA.url
         )
 
-        feed_path = f"/qapi/twins/{follower_twin_id}/interests/twins/{followed_twin_id}/feeds/{followed_feed_name}"
-
-        stomp_client = StompClient(
-            endpoint=response["stomp"],
-            callback=callback,
-            token=self._refresh_token(),
-        )
-        stomp_client.setup()
-        stomp_client.subscribe(
-            destination=feed_path,
-            subscription_id=self._headers["Iotics-ClientRef"],
-            headers=self._headers,
-        )
+        return sensor_data
 
 
 class StompClient:
