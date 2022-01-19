@@ -41,7 +41,7 @@ def _set_twin_meta(self, twin_id: str):
     self.twin_api.update_twin(
         twin_id,
         add_props=[twin_label, twin_description],  # List or tuple of ModelProperty instances
-        location=london_location, # Must be instance of GeoLocation, as constructed above.
+        location=london_location, # Must be instance of GeoLocationUpdate, as constructed above.
     )
 ```
 
