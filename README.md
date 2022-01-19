@@ -231,6 +231,7 @@ Version compatibility with Iotics host:
 | ---: | --- |
 | `>=2.0.11` | `~=1.1` |
 | `>=3.0` | `>=2.0.350` |
+| `>=7.0` | `>=3.0.692` |
 
 
 ## Iotics Internal Links

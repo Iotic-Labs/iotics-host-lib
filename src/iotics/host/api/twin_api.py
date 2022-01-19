@@ -221,8 +221,9 @@ class TwinApi:
             properties: ListOrTuple[ModelProperty] = None, feeds: ListOrTuple[UpsertFeedWithMeta] = None
     ) -> UpsertTwinResponsePayload:
         """Upsert creates or update a twin with its metadata + the twin's feeds with their metadata.
-        The full state is applied (ie. if the operation succeeds the state of the twin/feeds will be the one
-        described in the payload) the metadata describing a twin.
+        The full state is applied, ie. if the operation succeeds the state of the twin/feeds will be the one described
+         in the payload. All properties and feeds not present will be deleted. If the location is not set, any location
+         the twin had will be removed. If the visibility is unset, the twin will return to the default of PRIVATE.
 
         Args:
             twin_id (str): ID of the twin to update

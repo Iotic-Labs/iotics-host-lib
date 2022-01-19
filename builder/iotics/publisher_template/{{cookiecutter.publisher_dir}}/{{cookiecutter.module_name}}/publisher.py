@@ -49,18 +49,28 @@ class {{cookiecutter.publisher_class_name}}:
         self.agent_auth = agent_auth
 
     def _create_twin_and_feed(self) -> Tuple[str, str]:
-        # Create an twin id in the registerer
+        # Create a twin id in the resolver
         twin_id = self.agent_auth.make_twin_id(TWIN_NAME)
 
         # Create the twin with metadata and feed
-        # Properties of type http://www.w3.org/2000/01/rdf-schema#label will be indexed to match twin using the
-        # search by text
+        # Properties of type http://www.w3.org/2000/01/rdf-schema#label and #comments will be indexed to allow
+        # retrieval of twin via search by text
         twin_label = ModelProperty(key='http://www.w3.org/2000/01/rdf-schema#label',
                                    lang_literal_value=LangLiteral(lang='en', value='Random awesome twin'))
+        twin_description = ModelProperty(
+            key='http://www.w3.org/2000/01/rdf-schema#comment',
+            lang_literal_value=LangLiteral(lang='en', value='The first twin we made in Iotics')
+        )
         feed_label = ModelProperty(key='http://www.w3.org/2000/01/rdf-schema#label',
                                    lang_literal_value=LangLiteral(lang='en', value='Random temperature feed'))
+        feed_description = ModelProperty(
+            key='http://www.w3.org/2000/01/rdf-schema#comment',
+            lang_literal_value=LangLiteral(
+                lang='en',
+                value=f'Awesome feed generating a temperature in Celsius each {self.update_frequency_seconds} seconds'
+            )
+        )
         # Allow any host from the network to interact with this twin
-        # search by text
         allow_all_hosts = ModelProperty(key='http://data.iotics.com/public#hostAllowList',
                                         uri_value=Uri(value='http://data.iotics.com/public#allHosts'))
         # Set twin location to London
@@ -68,15 +78,16 @@ class {{cookiecutter.publisher_class_name}}:
         london_location = GeoLocation(lat=51.507359, lon=-0.136439)
 
         feed_name = 'random_temperature_feed'
-        self.twin_api.upsert_twin(twin_id, visibility=Visibility.PUBLIC,
+        self.twin_api.upsert_twin(twin_id, visibility=Visibility.PRIVATE,
                                   properties=[
                                       twin_label,
+                                      twin_description,
                                       allow_all_hosts,
                                   ],
                                   location=london_location,
                                   feeds=[UpsertFeedWithMeta(id=feed_name,
                                                             store_last=True,
-                                                            properties=[feed_label],
+                                                            properties=[feed_label, feed_description],
                                                             values=[
                                                                 Value(label='temp',
                                                                       data_type=BasicDataTypes.DECIMAL.value,
