@@ -10,7 +10,7 @@ TODO: summary
 {% if cookiecutter.add_example_code == "YES" %}
 In `publisher.py` the example:
 
-### Creates a twin and sets its basic metadata
+### Creating a twin and setting its basic metadata
 The update_twin method has parameters for setting some basic metadata to make the twin accessible via text- and
 location-based searches. Further capabilities for describing twins are shown [below](#adding-more-semantic-metadata-via-custom-properties).
 ```python
@@ -28,15 +28,19 @@ def _set_twin_meta(self, twin_id: str):
         key='http://www.w3.org/2000/01/rdf-schema#label',
         lang_literal_value=LangLiteral(lang='en', value='Twin 1')
     )
+    twin_description = ModelProperty(
+        key='http://www.w3.org/2000/01/rdf-schema#comment',
+        lang_literal_value=LangLiteral(lang='en', value='The first twin we made in Iotics')
+    )
 
-    # Set twin location to London, using the GeoLocation class to provide its latitude and longitude.
+    # Set twin location to London, using the GeoLocationUpdate class to provide its latitude and longitude.
     # This will make the twin visible in Iotics Cloud and it will enable the search by location.
-    london_location = GeoLocation(lat=51.507359, lon=-0.136439)
+    london_location = GeoLocationUpdate(location=GeoLocation(lat=51.507359, lon=-0.136439))
 
     # More information on the parameters of this method is available in the iotics-host-lib source code.
-    self.twin_api.upsert_twin(
+    self.twin_api.update_twin(
         twin_id,
-        properties=[twin_label],  # List or tuple of ModelProperty instances
+        add_props=[twin_label, twin_description],  # List or tuple of ModelProperty instances
         location=london_location, # Must be instance of GeoLocation, as constructed above.
     )
 ```
@@ -47,7 +51,7 @@ This will make the twin visible in Iotics Cloud.
 Read more about Iotics Cloud in the Iotics documentation: [Getting started with Iotics Cloud](https://docs.iotics.com/docs/getting-started-with-iotics-cloud)
 
 ### Creates a feed and sets its metadata
-Feeds are described using many of the same properties as twins, (eg labels and comments), as shown above. Additionally,
+Feeds are described using many of the same properties as twins (eg labels and comments), as shown above. Additionally,
 Feeds have associated Values with details of what sort of data is present in each shared update. For example, the Feed
 below has one Value, explaining that each share will have a decimal number (not a string or boolean, for instance)
 representing degrees Celsius. The `unit` parameter is set to an IRI representing °C in a popular ontology for units of
@@ -63,21 +67,56 @@ def _set_feed_meta(self, twin_id: str, feed_name: str):
         key='http://www.w3.org/2000/01/rdf-schema#label',
         lang_literal_value=LangLiteral(lang='en', value='Random temperature feed')
     )
+    feed_description = ModelProperty(
+        key='http://www.w3.org/2000/01/rdf-schema#comment',
+        lang_literal_value=LangLiteral(
+            lang='en',
+            value=f'Awesome feed generating a temperature in Celsius each {self.update_frequency_seconds} seconds'
+        )
+    )
 
-    self.feed_api.upsert_twin(
-        twin_id, feeds=UpsertFeedWithMeta(
-            id=feed_name,
-            store_last=True,
-            properties=[feed_label],
-            values=[
-                Value(label='temp',
-                      data_type=BasicDataTypes.DECIMAL.value,
-                      comment='a random temperature in Celsius',
-                      unit='http://purl.obolibrary.org/obo/UO_0000027'),
-            ])
+    self.feed_api.update_feed(
+        add_props=[feed_label, feed_description],
+        store_last=True,  # Whether this feed's most recent data can be retrieved via the InterestApi
+        add_values=[
+            Value(label='temp',
+                  data_type=BasicDataTypes.DECIMAL.value,
+                  comment='a random temperature in Celsius',
+                  unit='http://purl.obolibrary.org/obo/UO_0000027'),
+        ]
     )
 ```
 
+### Creating a twin and its feeds, and their metadata all at once
+The above twin and its feed could be created and updated in one call using the `upsert_twin` method, as shown below. 
+This method will set a given twin's state to precisely the one specified by its arguments, deleting all other feeds 
+and metadata if present.
+
+```python
+def _create_twin_and_feed(self, twin_name: str, feed_name: str):
+    twin_id = self.agent_auth.make_twin_id(twin_name)
+    london_location = GeoLocation(lat=51.507359, lon=-0.136439)  # No GeoLocationUpdate wrapper
+
+    # definition of properties omitted; they are the same as above.
+    # twin_label = ModelProperty(...
+
+    self.twin_api.upsert_twin(
+        twin_id,
+        properties=[twin_label, twin_description],
+        location=london_location,
+        feeds=[UpsertFeedWithMeta(
+            id=feed_name,
+            store_last=True,
+            properties=[feed_label, feed_description],
+            values=[Value(
+                label='temp',
+                data_type=BasicDataTypes.DECIMAL.value,
+                comment='a random temperature in Celsius',
+                unit='http://purl.obolibrary.org/obo/UO_0000027'
+            )]
+        )]
+    )
+```
 ### Publishes data to the feed
 The data shared to a Feed should be a base64-encoded dict keyed with the Feed's Value labels. You may also explicitly
 set a time associated with this share.
@@ -124,6 +163,9 @@ Read more about properties in the Iotics documentation:
 def _set_twin_meta(self, twin_id: str):
     category_property = ModelProperty(key='http://data.iotics.com/ns/category',
                                       uri_value=Uri(value='http://data.iotics.com/category/Temperature'))
+    
+    # Using upsert_twin will cause all other properties to be cleared! To avoid this, use update_twin below.
+    # self.twin_api.upsert_twin(twin_id, properties=[category_property])
 
     self.twin_api.update_twin(
         twin_id,

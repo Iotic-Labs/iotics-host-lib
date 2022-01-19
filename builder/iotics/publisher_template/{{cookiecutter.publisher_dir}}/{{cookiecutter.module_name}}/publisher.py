@@ -68,7 +68,7 @@ class {{cookiecutter.publisher_class_name}}:
         london_location = GeoLocation(lat=51.507359, lon=-0.136439)
 
         feed_name = 'random_temperature_feed'
-        self.twin_api.upsert_twin(twin_id, visibility=Visibility.PUBLIC,
+        self.twin_api.upsert_twin(twin_id, visibility=Visibility.PRIVATE,
                                   properties=[
                                       twin_label,
                                       allow_all_hosts,

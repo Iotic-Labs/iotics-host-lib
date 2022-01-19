@@ -19,10 +19,10 @@ In `follower.py` the example:
 ```
 
 ### Text based searches for and follows twins
-This search will return twins with matching text in their or their feeds' labels. You can see the
-publisher adding such a label to the twins it creates in its `_set_twin_meta` method. Once found, these twins have their
-'random_temperature_feed' subscribed to by the follower, and a callback is set that will fire whenever data is shared to
-this feed.
+This search will return twins with matching text in their or their feeds' `rdfs:label` or `rdfs:comment` properties. 
+You can see the publisher adding such properties to the twins it creates in its `_set_twin_meta` method. Once found,
+these twins have their 'random_temperature_feed' subscribed to by the follower, and a callback is set that will fire 
+whenever data is shared to this feed.
 ```python
 def follow_twins(self):
     """Find and follow twins"""
