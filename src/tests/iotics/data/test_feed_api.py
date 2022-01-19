@@ -4,7 +4,7 @@ from functools import partial
 
 import pytest
 from iotic.web.rest.client.qapi import ApiException, ApiValueError, Configuration, FeedApi as FeedClient, LangLiteral, \
-    Value
+    Value, ModelProperty, Literal
 
 from iotics.host.api.feed_api import FeedApi, get_feed_api
 from iotics.host.api.qapi import QApiFactory
@@ -84,12 +84,8 @@ def get_list_feeds_call():
 
 def get_update_feed_call():
     return partial(get_test_feed_api().update_feed, twin_id='a twin id', feed_id='a feed id',
-                   add_labels=(LangLiteral(lang='fr', value='un label'),),
-                   del_labels=('a label',),
-                   add_comments=(LangLiteral(lang='fr', value='un commentaire'),),
-                   del_comments=('a comment',),
-                   add_tags=('tag1', 'tag2'),
-                   del_tags=('tag3',),
+                   add_props=(ModelProperty(key='key1', lang_literal_value=LangLiteral(lang='fr', value='une valeur')),
+                              ModelProperty(key='key2', literal_value=Literal(data_type='data type', value='a value'))),
                    add_values=(Value(comment='a comment', data_type='a data type', label='a label', unit='a unit'),),
                    del_values=('a value',),
                    store_last=True,

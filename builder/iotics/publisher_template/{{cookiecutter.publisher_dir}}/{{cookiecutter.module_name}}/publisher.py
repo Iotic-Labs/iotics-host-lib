@@ -5,9 +5,11 @@ import logging
 import random
 import time
 from datetime import datetime, timezone
+from typing import Tuple
 from uuid import uuid4
 
-from iotic.web.rest.client.qapi import LangLiteral, Value, GeoLocationUpdate, GeoLocation
+from iotic.web.rest.client.qapi import LangLiteral, Value, GeoLocation, ModelProperty, Visibility, \
+    Uri, UpsertFeedWithMeta
 from iotics.host.api.data_types import BasicDataTypes
 {% else %}
 import logging
@@ -46,55 +48,46 @@ class {{cookiecutter.publisher_class_name}}:
         self.feed_api = qapi_factory.get_feed_api()
         self.agent_auth = agent_auth
 
-    def _create_twin(self) -> str:
+    def _create_twin_and_feed(self) -> Tuple[str, str]:
         # Create an twin id in the registerer
         twin_id = self.agent_auth.make_twin_id(TWIN_NAME)
 
-        # Create the twin
-        self.twin_api.create_twin(twin_id)
-        return twin_id
-
-    def _set_twin_meta(self, twin_id: str):
-        label = 'Random awesome twin'
-        description = 'Awesome twin for random data'
-
+        # Create the twin with metadata and feed
+        # Properties of type http://www.w3.org/2000/01/rdf-schema#label will be indexed to match twin using the
+        # search by text
+        twin_label = ModelProperty(key='http://www.w3.org/2000/01/rdf-schema#label',
+                                   lang_literal_value=LangLiteral(lang='en', value='Random awesome twin'))
+        feed_label = ModelProperty(key='http://www.w3.org/2000/01/rdf-schema#label',
+                                   lang_literal_value=LangLiteral(lang='en', value='Random temperature feed'))
+        # Allow any host from the network to interact with this twin
+        # search by text
+        allow_all_hosts = ModelProperty(key='http://data.iotics.com/public#hostAllowList',
+                                        uri_value=Uri(value='http://data.iotics.com/public#allHosts'))
         # Set twin location to London
         # This will make the twin visible in Iotics Cloud and it will enable the search by location.
-        london_location = GeoLocationUpdate(location=GeoLocation(lat=51.507359, lon=-0.136439))
+        london_location = GeoLocation(lat=51.507359, lon=-0.136439)
 
-        self.twin_api.update_twin(
-            twin_id,
-            add_tags=['random', 'awesome'],
-            add_labels=[LangLiteral(value=label, lang='en')],
-            add_comments=[LangLiteral(value=description, lang='en')],
-            location=london_location,
-        )
-        logging.info('Created Twin %s', self.twin_api.describe_twin(twin_id=twin_id))
-
-    def _create_feed(self, twin_id: str) -> str:
         feed_name = 'random_temperature_feed'
-        self.feed_api.create_feed(twin_id, feed_name)
-        return feed_name
+        self.twin_api.upsert_twin(twin_id, visibility=Visibility.PUBLIC,
+                                  properties=[
+                                      twin_label,
+                                      allow_all_hosts,
+                                  ],
+                                  location=london_location,
+                                  feeds=[UpsertFeedWithMeta(id=feed_name,
+                                                            store_last=True,
+                                                            properties=[feed_label],
+                                                            values=[
+                                                                Value(label='temp',
+                                                                      data_type=BasicDataTypes.DECIMAL.value,
+                                                                      comment='a random temperature in Celsius',
+                                                                      unit='http://purl.obolibrary.org/obo/UO_0000027'),
+                                                            ])
+                                         ]
+                                  )
 
-    def _set_feed_meta(self, twin_id: str, feed_name: str):
-        label = 'Random temperature feed'
-        description = f'Awesome feed generating a temperature in Celsius each {self.update_frequency_seconds} seconds'
-
-        self.feed_api.update_feed(
-            twin_id, feed_name,
-            add_labels=[LangLiteral(value=label, lang='en')],
-            add_comments=[LangLiteral(value=description, lang='en')],
-            # Whether this feed's most recent data can be retrieved via the InterestApi
-            store_last=True,
-            add_tags=['random', 'awesome'],
-            add_values=[
-                Value(label='temp',
-                      data_type=BasicDataTypes.DECIMAL.value,
-                      comment='a random temperature in Celsius',
-                      unit='http://purl.obolibrary.org/obo/UO_0000027'),
-            ]
-        )
-        logging.info('Created Feed %s', self.feed_api.describe_feed(twin_id=twin_id, feed_id=feed_name))
+        logging.info('Created Feed and twin %s', self.feed_api.describe_feed(twin_id=twin_id, feed_id=feed_name))
+        return twin_id, feed_name
 
     def _share_feed_data(self, twin_id: str, feed_name: str):
         non_encoded_data = {
@@ -120,12 +113,7 @@ class {{cookiecutter.publisher_class_name}}:
         """Create an twin and set its metadata. Create a feed an set its metadata."""
 
         logger.info('Publisher setup')
-        twin_id = self._create_twin()
-        self._set_twin_meta(twin_id)
-
-        feed_name = self._create_feed(twin_id)
-        self._set_feed_meta(twin_id, feed_name)
-
+        twin_id, feed_name = self._create_twin_and_feed()
         return twin_id, feed_name
 
     def publish(self, twin_id: str, feed_name: str):

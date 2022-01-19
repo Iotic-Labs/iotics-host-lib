@@ -1,9 +1,9 @@
 from uuid import uuid4
 
 from iotic.web.rest.client.qapi import ApiClient, CreateFeedRequestPayload, CreateFeedResponsePayload, \
-    DeleteFeedResponsePayload, DescribeFeedResponsePayload, FeedApi as FeedClient, FeedData, FeedID, LabelUpdate, \
-    LangLiteral, ListAllFeedsResponsePayload, ShareFeedDataRequestPayload, Tags, UpdateFeedRequestPayload, \
-    UpdateFeedResponsePayload, Value, Values
+    DeleteFeedResponsePayload, DescribeFeedResponsePayload, FeedApi as FeedClient, FeedData, FeedID, \
+    ListAllFeedsResponsePayload, ShareFeedDataRequestPayload, UpdateFeedRequestPayload, \
+    UpdateFeedResponsePayload, Value, Values, ModelProperty, PropertyUpdate
 
 from iotics.host import metrics
 from iotics.host.api.utils import check_and_retry_with_new_token, fill_refs, ListOrTuple
@@ -114,13 +114,7 @@ class FeedApi:
                 id (FeedID): has sole attribute `value`, containing the feed's ID as a string
                 twin_id (TwinID): has sole attribute `value`, containing the twin's ID as a string
             result (MetaResult):
-                comments (list[LangLiteral]): all the comments on the feed, max one per language. LangLiteral structure:
-                    lang (str): 2-character language code
-                    value (str): the text content of the comment
-                labels (list[LangLiteral]): all the labels on the feed, max one per language
                 store_last (bool): Whether this feed's most recent data can be retrieved via the InterestApi
-                tags (list[str]) (TO BE DEPRECATED): Any tags that have been added to the feed
-                    - note: TAGS ARE TO BE DEPRECATED PLEASE DONT USE
                 values (list[Value]): What sort of data to expect in each feed share. Non-binding. Value structure (all
                         optional strings):
                     comment: A human-readable description of the value. Language-specific, eg "Engine oil temperature"
@@ -160,13 +154,7 @@ class FeedApi:
                 id (FeedID): has sole attribute `value`, containing the feed's ID as a string
                 twin_id (TwinID): has sole attribute `value`, containing the twin's ID as a string
             result (MetaResult):
-                comments (list[LangLiteral]): all the comments on the feed, max one per language. LangLiteral structure:
-                    lang (str): 2-character language code
-                    value (str): the text content of the comment
-                labels (list[LangLiteral]): all the labels on the feed, max one per language
                 store_last (bool): Whether this feed's most recent data can be retrieved via the InterestApi
-                tags (list[str]) (TO BE DEPRECATED): Any tags that have been added to the feed
-                    - note: TAGS ARE TO BE DEPRECATED PLEASE DONT USE
                 values (list[Value]): What sort of data to expect in each feed share. Non-binding. Value structure (all
                         optional strings):
                     comment: A human-readable description of the value. Language-specific, eg "Engine oil temperature"
@@ -190,9 +178,8 @@ class FeedApi:
     @fill_refs
     def update_feed(
             self, twin_id: str, feed_id: str,
-            add_labels: ListOrTuple[LangLiteral] = None, del_labels: ListOrTuple[str] = None,
-            add_comments: ListOrTuple[LangLiteral] = None, del_comments: ListOrTuple[str] = None,
-            add_tags: ListOrTuple[str] = None, del_tags: ListOrTuple[str] = None,
+            add_props: ListOrTuple[ModelProperty] = None, del_props: ListOrTuple[ModelProperty] = None,
+            del_props_by_key: ListOrTuple[str] = None, clear_all_props: bool = False,
             add_values: ListOrTuple[Value] = None, del_values: ListOrTuple[str] = None,
             store_last: bool = None, client_ref: str = None, transaction_ref: str = None
     ) -> UpdateFeedResponsePayload:
@@ -201,15 +188,13 @@ class FeedApi:
         Args:
             twin_id (str): the ID of the twin providing the feed
             feed_id (str): a unique identifier for the feed, scoped per-twin
-            add_labels (list/tuple[LangLiteral], optional): List of labels to be added. Only one label per language is
-                stored, i.e. any existing ones with the same language will be replaced.
-            del_labels (list/tuple[str], optional): List of languages for which languages should be removed
-            add_comments (list/tuple[LangLiteral], optional): List of comments to be added. Same language caveat as for
-                labels
-            del_comments: (list/tuple[str], optional): List of languages for which comments should be deleted
-            add_tags (TO BE DEPRECATED): (list/tuple[str], optional): List of tags to be added
-                - note: TAGS ARE TO BE DEPRECATED PLEASE DONT USE
-            del_tags: (list/tuple[str], optional): List of tags to be deleted
+            add_props: (list/tuple[ModelProperty], optional): List of semantic properties to be added to the feed. Each
+                property has a key (string, corresponding to the property's predicate), and one of several value types
+                corresponding to the property's object: LangLiteral, StringLiteral, Literal, or Uri
+            del_props: (list/tuple[ModelProperty], optional): List of semantic properties to be removed from the feed.
+            del_props_by_key (list/tuple[str], optional): List of keys (predicates) for which all matching properties
+                will be deleted from the twin
+            clear_all_props (bool, optional): Whether to remove all non-internal properties. Defaults to False
             add_values: (list/tuple[Value], optional): List of Values, a datatype describing what sort of information to
                 expect from the feed, to be added. If a Value's label appears in del_values (below) it will not be added
             del_values: (list/tuple[str], optional): Any Values with a label among these strings will be removed
@@ -221,12 +206,13 @@ class FeedApi:
         Returns: UpdateFeedResponsePayload, with sole attribute `feed` identifying the updated feed by id and twin_id
 
         """
+
         payload = UpdateFeedRequestPayload(
-            labels=LabelUpdate(added=add_labels, deleted_by_lang=del_labels),
-            comments=LabelUpdate(added=add_comments, deleted_by_lang=del_comments),
-            tags=Tags(added=add_tags, deleted=del_tags),
             values=Values(added=add_values, deleted_by_label=del_values),
-            store_last=store_last if store_last else None
+            store_last=store_last if store_last else None,
+            properties=PropertyUpdate(
+                added=add_props, deleted=del_props, cleared_all=clear_all_props, deleted_by_key=del_props_by_key
+            )
         )
         return self.rest_api_client.update_feed(
             twin_id=twin_id,

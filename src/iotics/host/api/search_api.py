@@ -196,9 +196,8 @@ class SearchAPI:
         Args:
             timeout (int, optional): How many seconds to search for (default 10)
             response_type (ResponseType, optional): Which data to return for each result, choices are:
-                FULL (default): including twin and feed identifiers, labels/comments (for all languages if no language
-                    provided), properties and location. TODO: Comments not mentioned in docs for return type
-                LOCATED: including twin identifiers, location and label (for the provided language or default)
+                FULL (default): including twin and feed identifiers, properties and location.
+                LOCATED: including twin identifiers and location (for the provided language or default)
                 MINIMAL:  including twins identifier only.
             radius_km (float, optional): How far from the given coordinates to return twins. Must be used with lat/long
             lat (float, optional): The latitude at the centre of the search radius. Must be used with radius_km and long
@@ -213,8 +212,8 @@ class SearchAPI:
                     value (str): Content of the value as a string
                 string_literal_value (StringLiteral): Describes a string w/o language. One attribute, `value` (str)
                 uri_value (Uri): One attribute, `value`, a string representing a URI
-            text (str, optional): One or more keywords which must match either text from twin/feed labels/comments
-                (in the given language). Note that any (rather than all) of the keywords will produce a match.
+            text (str, optional): One or more keywords which must match either text from twin/feed rdfs:label
+                properties. Note that any (rather than all) of the keywords will produce a match.
             scope (Scope, optional): Either LOCAL (default) to only return twins from the local host, or GLOBAL to
                 return twins from anywhere on the network.
 
@@ -227,18 +226,14 @@ class SearchAPI:
                     feed (Feed):
                         id (FeedID): has sole attribute `value`, containing the feed's ID as a string
                         twin_id (TwinID): has sole attribute `value`, containing the twin's ID as a string (redundant?)
-                    label (str): The feed human readable label in the language specified in the request (if set)
                     store_last (bool): Whether you can access the last data shared to this feed via the InterestApi
                 id (TwinID): has sole attribute `value`, containing the twin's ID as a string (redundant?)
-                label (str): Twin human readable label in the language specified in the request (if set). Included with
-                    response_type FULL and LOCATED
                 location (GeoLocation) - The coordinates of the non-digital twin:
                     lat (float): latitude
                     lon (float): longitude
                 properties (list[ModelProperty]) - The custom semantic properties added to the twin.
                     See args for structure.
                     Included with response type FULL
-                tags (list[str]): Any tags added to the twin. Included with response type FULL
 
         """
         if not any(val is not None for val in [radius_km, lat, long]):

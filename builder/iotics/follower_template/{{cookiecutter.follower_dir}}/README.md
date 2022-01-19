@@ -19,8 +19,8 @@ In `follower.py` the example:
 ```
 
 ### Text based searches for and follows twins
-This search will return twins with matching text in their or their feeds' labels, descriptions or tags. You can see the
-publisher adding such a tag to the twins it creates in its `_set_twin_meta` method. Once found, these twins have their
+This search will return twins with matching text in their or their feeds' labels. You can see the
+publisher adding such a label to the twins it creates in its `_set_twin_meta` method. Once found, these twins have their
 'random_temperature_feed' subscribed to by the follower, and a callback is set that will fire whenever data is shared to
 this feed.
 ```python
@@ -73,7 +73,8 @@ def run(self):
 ```
 
 ### Get feed's most recent data via the InterestApi
-A feed's most recent data is available via the InterestApi if the followed feed has the tag `store_last` set to `True`
+A feed's most recent data is available via the InterestApi if the followed feed has the parameter `store_last` set to 
+`True`
 (cf. publisher example)
 ```python
 def get_most_recent_data(self, followed_twin_id: str, feed_id: str):

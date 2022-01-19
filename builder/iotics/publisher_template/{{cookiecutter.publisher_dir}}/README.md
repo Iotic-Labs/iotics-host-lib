@@ -24,20 +24,20 @@ def _create_twin(self) -> str:
 
 def _set_twin_meta(self, twin_id: str):
     # The RDF Schema provides "label" and "comment" properties to provide basic details of resources: https://www.w3.org/TR/rdf-schema/#ch_label
-    label = 'Twin 1'  # A human-readable version of the twin's name
-    comment = 'The first twin we made in Iotics'  # Space to put more free text describing the twin
+    twin_label = ModelProperty(
+        key='http://www.w3.org/2000/01/rdf-schema#label',
+        lang_literal_value=LangLiteral(lang='en', value='Twin 1')
+    )
 
-    # Set twin location to London, using the GeoLocationUpdate class to provide its latitude and longitude.
+    # Set twin location to London, using the GeoLocation class to provide its latitude and longitude.
     # This will make the twin visible in Iotics Cloud and it will enable the search by location.
-    london_location = GeoLocationUpdate(location=GeoLocation(lat=51.507359, lon=-0.136439))
+    london_location = GeoLocation(lat=51.507359, lon=-0.136439)
 
     # More information on the parameters of this method is available in the iotics-host-lib source code.
-    self.twin_api.update_twin(
+    self.twin_api.upsert_twin(
         twin_id,
-        add_tags=['random', 'awesome'], # Deprecated pre-RDF way of describing twins.
-        add_labels=[LangLiteral(value=label, lang='en')],     # Labels and comments must be language-tagged literals --
-        add_comments=[LangLiteral(value=comment, lang='en')], # see https://www.w3.org/TR/rdf11-concepts/#section-Graph-Literal
-        location=london_location, # Must be instance of GeoLocationUpdate, as constructed above.
+        properties=[twin_label],  # List or tuple of ModelProperty instances
+        location=london_location, # Must be instance of GeoLocation, as constructed above.
     )
 ```
 
@@ -59,22 +59,22 @@ def _create_feed(self, twin_id: str) -> str:
     return feed_name
 
 def _set_feed_meta(self, twin_id: str, feed_name: str):
-    label = 'Random temperature feed'
-    comment = f'Awesome feed generating a temperature in Celsius each {self.update_frequency_seconds} seconds'
+    feed_label = ModelProperty(
+        key='http://www.w3.org/2000/01/rdf-schema#label',
+        lang_literal_value=LangLiteral(lang='en', value='Random temperature feed')
+    )
 
-    self.feed_api.update_feed(
-        twin_id, feed_name,
-        add_labels=[LangLiteral(value=label, lang='en')],
-        add_comments=[LangLiteral(value=comment, lang='en')],
-        # Whether this feed's most recent data can be retrieved via the InterestApi
-        store_last=True,
-        add_tags=['random', 'awesome'],
-        add_values=[
-            Value(label='temp',
-                  data_type=BasicDataTypes.DECIMAL.value,
-                  comment='a random temperature in Celsius',
-                  unit='http://purl.obolibrary.org/obo/UO_0000027'),
-        ]
+    self.feed_api.upsert_twin(
+        twin_id, feeds=UpsertFeedWithMeta(
+            id=feed_name,
+            store_last=True,
+            properties=[feed_label],
+            values=[
+                Value(label='temp',
+                      data_type=BasicDataTypes.DECIMAL.value,
+                      comment='a random temperature in Celsius',
+                      unit='http://purl.obolibrary.org/obo/UO_0000027'),
+            ])
     )
 ```
 
