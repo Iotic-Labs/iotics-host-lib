@@ -1,22 +1,31 @@
 import base64
 import json
-import requests
 from time import sleep
 
-from iotics.host.api.data_types import BasicDataTypes
-from iotics.host.api.qapi import QApiFactory
+import requests
 from iotic.web.rest.client.qapi import (
-    GeoLocationUpdate,
     GeoLocation,
     LangLiteral,
     ModelProperty,
     StringLiteral,
+    UpsertFeedWithMeta,
     Uri,
     Value,
     Visibility,
 )
+from iotics.host.api.data_types import BasicDataTypes
+from iotics.host.api.qapi import QApiFactory
 from iotics.host.auth import AgentAuthBuilder
 from iotics.host.conf.base import DataSourcesConfBase
+
+RESOLVER_URL = "resolver_url"
+QAPI_URL = "qapi_url"
+QAPI_STOMP_URL = "qapi_stomp_url"
+
+USER_KEY_NAME = "user_key_name"
+AGENT_KEY_NAME = "agent_key_name"
+USER_SEED = "user_seed"
+AGENT_SEED = "agent_seed"
 
 MODEL_TYPE_PROPERTY = ModelProperty(
     key="http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
@@ -26,6 +35,9 @@ ALLOW_ALL_HOSTS_PROPERTY = ModelProperty(
     key="http://data.iotics.com/public#hostAllowList",
     uri_value=Uri(value="http://data.iotics.com/public#allHosts"),
 )
+LABEL_PREDICATE = "http://www.w3.org/2000/01/rdf-schema#label"
+
+MODEL_LABEL = "Machine model (tutorial)"
 SOURCE_FEED_NAME = "currentTemp"
 SOURCE_VALUE_LABEL = "temperature"
 OUTPUT_FEED_NAME = "temperature_status"
@@ -33,49 +45,118 @@ OUTPUT_VALUE_LABEL = "status"
 SUBSCRIPTIONS_MAP = {}
 SENSORS_MAP = {}
 
+TWIN_VISIBILITY = Visibility.PRIVATE
 
-def create_machine_from_model(data, agent_auth, api_factory):
-    twin_api = api_factory.get_twin_api()
-    feed_api = api_factory.get_feed_api()
-    search_api = api_factory.get_search_api()
 
-    model_twin = next(
-        search_api.search_twins(
-            text="Machine model (tutorial)", properties=[MODEL_TYPE_PROPERTY]
+class Tutorial:
+    def __init__(self):
+        self._agent_auth = None
+        self._twin_api = None
+        self._search_api = None
+        self._feed_api = None
+        self._follow_api = None
+
+    def setup(self):
+        self._agent_auth = AgentAuthBuilder.build_agent_auth(
+            resolver_url=RESOLVER_URL,
+            user_seed=USER_SEED,
+            user_key_name=USER_KEY_NAME,
+            agent_seed=AGENT_SEED,
+            agent_key_name=AGENT_KEY_NAME,
         )
-    ).twins[0]
-    model_twin_id = model_twin.id.value
 
-    machines_dict = {}
+        api_factory = QApiFactory(
+            DataSourcesConfBase(qapi_url=QAPI_URL, qapi_stomp_url=QAPI_STOMP_URL),
+            self._agent_auth,
+        )
+        self._twin_api = api_factory.get_twin_api()
+        self._search_api = api_factory.get_search_api()
+        self._feed_api = api_factory.get_feed_api()
+        self._follow_api = api_factory.get_follow_api()
 
-    for machine_number, sensor_data in enumerate(data):
-        machine_name = f"machine_{machine_number}"
+    def create_model(self):
+        # Create Model Twin
+        model_twin_id = self._agent_auth.make_twin_id("MachineModel")
 
-        machine_twin_id = agent_auth.make_twin_id(machine_name)
-        twin_api.create_twin(machine_twin_id)
+        # Update Twin with Metadata, Feed and Value
+        self._twin_api.upsert_twin(
+            twin_id=model_twin_id,
+            visibility=TWIN_VISIBILITY,
+            properties=[
+                MODEL_TYPE_PROPERTY,
+                ALLOW_ALL_HOSTS_PROPERTY,
+                ModelProperty(
+                    key=LABEL_PREDICATE,
+                    lang_literal_value=LangLiteral(value=MODEL_LABEL, lang="en"),
+                ),
+            ],
+            feeds=[
+                UpsertFeedWithMeta(
+                    id=SOURCE_FEED_NAME,
+                    store_last=True,
+                    properties=[
+                        ModelProperty(
+                            key=LABEL_PREDICATE,
+                            lang_literal_value=LangLiteral(
+                                value="Current temperature", lang="en"
+                            ),
+                        )
+                    ],
+                    values=[
+                        Value(
+                            label=SOURCE_VALUE_LABEL,
+                            comment="Temperature in degrees Celsius",
+                            unit="http://purl.obolibrary.org/obo/UO_0000027",
+                            data_type=BasicDataTypes.DECIMAL.value,
+                        )
+                    ],
+                )
+            ],
+        )
 
-        data_to_share = {SOURCE_VALUE_LABEL: sensor_data["temp"]}
-        encoded_data = base64.b64encode(json.dumps(data_to_share).encode()).decode()
+        print("Model twin created")
 
-        for feed in model_twin.feeds:
-            feed_id = feed.feed.id.value
-            feed_info = feed_api.describe_feed(model_twin_id, feed_id).result
-            feed_api.create_feed(machine_twin_id, feed_id)
-            feed_api.update_feed(
-                machine_twin_id,
-                feed_id,
-                add_labels=feed_info.labels,
-                add_comments=feed_info.comments,
-                add_values=feed_info.values,
-                store_last=feed_info.store_last,
-            )
-            twin_api.update_twin(
-                machine_twin_id,
-                location=GeoLocationUpdate(location=GeoLocation(lat=51.5, lon=-0.1)),
-                add_labels=[LangLiteral(lang="en", value=f"{machine_name} (tutorial)")],
-                new_visibility=Visibility.PUBLIC,
-                add_props=[
+        return model_twin_id
+
+    def create_machine_from_model(self, data):
+        # Search for Machine Model
+        twins_list = self._search_api.search_twins(
+            properties=[MODEL_TYPE_PROPERTY], text=MODEL_LABEL
+        )
+
+        model_twin = next(twins_list).twins[0]
+        model_twin_id = model_twin.id.value
+
+        # Create new twins based on the model
+        for machine_number, sensor_data in enumerate(data):
+            machine_name = f"machine_{machine_number}"
+            machine_twin_id = self._agent_auth.make_twin_id(machine_name)
+
+            # Create Twin
+            self._twin_api.create_twin(machine_twin_id)
+
+            # Get the Model Twin's feeds list
+            model_feeds_list = model_twin.feeds
+            # Get the id of the first (and only) feed in the list
+            feed_id = next(iter(model_feeds_list)).feed.id.value
+            # Describe the feed to get metadata and properties
+            feed_info = self._feed_api.describe_feed(
+                twin_id=model_twin_id, feed_id=feed_id
+            ).result
+
+            # Update Twin with Metadata, Feed(s) and Value(s)
+            self._twin_api.upsert_twin(
+                twin_id=machine_twin_id,
+                visibility=TWIN_VISIBILITY,
+                location=GeoLocation(lat=51.5, lon=-0.1),
+                properties=[
                     ALLOW_ALL_HOSTS_PROPERTY,
+                    ModelProperty(
+                        key=LABEL_PREDICATE,
+                        lang_literal_value=LangLiteral(
+                            value=f"{machine_name} (tutorial)", lang="en"
+                        ),
+                    ),
                     ModelProperty(
                         key="http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
                         uri_value=Uri(value="https://data.iotics.com/tutorial#Sensor"),
@@ -91,239 +172,223 @@ def create_machine_from_model(data, agent_auth, api_factory):
                         ),
                     ),
                 ],
-                clear_all_props=True,
-            )
-            feed_api.share_feed_data(
-                twin_id=machine_twin_id,
-                feed_id=feed_id,
-                data=encoded_data,
-                mime="application/json",
-            )
-
-        SENSORS_MAP[machine_name] = machine_twin_id
-        print("Machine twin created:", machine_name)
-
-    return machines_dict
-
-
-def share_data(data, agent_auth, api_factory):
-    feed_api = api_factory.get_feed_api()
-
-    for machine_number, sensor_data in enumerate(data):
-        machine_name = f"machine_{machine_number}"
-        machine_twin_id = SENSORS_MAP.get(machine_name)
-        if not machine_twin_id:
-            continue
-        data_to_share = {SOURCE_VALUE_LABEL: sensor_data["temp"]}
-        encoded_data = base64.b64encode(json.dumps(data_to_share).encode()).decode()
-
-        print("Sharing data for %s: %s" % (machine_name, data_to_share))
-        feed_api.share_feed_data(
-            twin_id=machine_twin_id,
-            feed_id=SOURCE_FEED_NAME,
-            data=encoded_data,
-            mime="application/json",
-        )
-
-
-def follow_callback(sub_id, body):
-    sensor = SUBSCRIPTIONS_MAP[sub_id]
-    interaction_data = json.loads(
-        base64.b64decode(body.payload.feed_data.data).decode("ascii")
-    )
-
-    if interaction_data[OUTPUT_VALUE_LABEL] == "extreme":
-        print("%s: SENSOR IS OVERHEATING! OH THE HUMANITY!!" % sensor)
-
-
-def follow_sensors(api_factory, interaction_twin_id):
-    search_api = api_factory.get_search_api()
-    follow_api = api_factory.get_follow_api()
-
-    output_twins = []
-
-    print("Searching for output twins", end="", flush=True)
-    sleep(10)
-
-    while len(output_twins) < len(SENSORS_MAP):
-        output_twins = next(
-            search_api.search_twins(
-                # text="tutorial",
-                properties=[
-                    ModelProperty(
-                        key="https://data.iotics.com/app#model",
-                        uri_value=Uri(value=interaction_twin_id),
+                feeds=[
+                    UpsertFeedWithMeta(
+                        id=feed_id,
+                        store_last=feed_info.store_last,
+                        properties=feed_info.properties,
+                        values=feed_info.values,
                     )
                 ],
             )
-        ).twins
 
-        sleep(10)
-        print(".", end="", flush=True)
+            # Share first sample of data
+            self._publish_feed_value(
+                sensor_data, twin_id=machine_twin_id, feed_id=feed_id, print_data=False
+            )
 
-    print("\nFound %s output twins" % len(output_twins))
+            SENSORS_MAP[machine_name] = machine_twin_id
 
-    for sensor in output_twins:
-        subscription_id = follow_api.subscribe_to_feed(
-            sensor.id.value, sensor.id.value, OUTPUT_FEED_NAME, follow_callback
-        )
-        SUBSCRIPTIONS_MAP[subscription_id] = sensor.label
+            print("Machine twin created:", machine_name)
 
+    def create_interaction(self, model_twin_id):
+        # Create Interaction Twin
+        interaction_twin_id = self._agent_auth.make_twin_id("SensorInteraction")
 
-def create_interaction(agent_auth, api_factory, model_twin_id):
-    twin_api = api_factory.get_twin_api()
-    feed_api = api_factory.get_feed_api()
-
-    interaction_twin_id = agent_auth.make_twin_id("SensorInteraction")
-    twin_api.create_twin(interaction_twin_id)
-
-    interaction_config = {
-        "enabled": True,
-        "rules": [
-            {
-                "transformation": {
-                    "conditions": [
-                        {
-                            "fieldsIncludedInOutput": [SOURCE_VALUE_LABEL],
-                            "jsonLogic": {">": [{"var": SOURCE_VALUE_LABEL}, 30]},
-                        }
-                    ],
-                    "outputFeedId": OUTPUT_FEED_NAME,
-                    "outputFieldId": OUTPUT_VALUE_LABEL,
-                    "outputTrueValue": "extreme",
-                    "outputFalseValue": "normal",
-                    "sourceFeedId": SOURCE_FEED_NAME,
-                    "sourceId": "1",
+        # Setup Interaction config
+        interaction_config = {
+            "enabled": True,
+            "rules": [
+                {
+                    "transformation": {
+                        "conditions": [
+                            {
+                                "fieldsIncludedInOutput": [SOURCE_VALUE_LABEL],
+                                "jsonLogic": {">": [{"var": SOURCE_VALUE_LABEL}, 30]},
+                            }
+                        ],
+                        "outputFeedId": OUTPUT_FEED_NAME,
+                        "outputFieldId": OUTPUT_VALUE_LABEL,
+                        "outputTrueValue": "extreme",
+                        "outputFalseValue": "normal",
+                        "sourceFeedId": SOURCE_FEED_NAME,
+                        "sourceId": "1",
+                    }
                 }
-            }
-        ],
-        "sources": [
-            {
-                "cleanupRateS": 900,
-                "feeds": [{"fieldIds": [SOURCE_VALUE_LABEL], "id": SOURCE_FEED_NAME}],
-                "filter": {
-                    "properties": [
-                        {
-                            "key": "https://data.iotics.com/app#model",
-                            "value": {"uriValue": {"value": model_twin_id}},
-                        }
+            ],
+            "sources": [
+                {
+                    "cleanupRateS": 900,
+                    "feeds": [
+                        {"fieldIds": [SOURCE_VALUE_LABEL], "id": SOURCE_FEED_NAME}
                     ],
-                    "text": None,
-                },
-                "id": "1",
-                "modelDid": model_twin_id,
-                "refreshRateS": 300,
-            }
-        ],
-    }
+                    "filter": {
+                        "properties": [
+                            {
+                                "key": "https://data.iotics.com/app#model",
+                                "value": {"uriValue": {"value": model_twin_id}},
+                            }
+                        ],
+                        "text": None,
+                    },
+                    "id": "1",
+                    "modelDid": model_twin_id,
+                    "refreshRateS": 300,
+                }
+            ],
+        }
 
-    twin_api.update_twin(
-        interaction_twin_id,
-        add_labels=[LangLiteral(lang="en", value="Sensor Overheating Alert")],
-        add_props=[
-            MODEL_TYPE_PROPERTY,
-            ALLOW_ALL_HOSTS_PROPERTY,
-            ModelProperty(
-                key="http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
-                uri_value=Uri(value="https://data.iotics.com/app#Interaction"),
-            ),
-            ModelProperty(
-                key="https://data.iotics.com/app#interactionConfig",
-                string_literal_value=StringLiteral(
-                    value=json.dumps(interaction_config)
+        # Update Twin with Metadata, Feed and Value
+        self._twin_api.upsert_twin(
+            twin_id=interaction_twin_id,
+            visibility=TWIN_VISIBILITY,
+            properties=[
+                MODEL_TYPE_PROPERTY,
+                ALLOW_ALL_HOSTS_PROPERTY,
+                ModelProperty(
+                    key="http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
+                    uri_value=Uri(value="https://data.iotics.com/app#Interaction"),
                 ),
-            ),
-        ],
-        clear_all_props=True,
-    )
+                ModelProperty(
+                    key="https://data.iotics.com/app#interactionConfig",
+                    string_literal_value=StringLiteral(
+                        value=json.dumps(interaction_config)
+                    ),
+                ),
+                ModelProperty(
+                    key=LABEL_PREDICATE,
+                    lang_literal_value=LangLiteral(
+                        value="Sensor Overheating Alert", lang="en"
+                    ),
+                ),
+            ],
+            feeds=[
+                UpsertFeedWithMeta(
+                    id=OUTPUT_FEED_NAME,
+                    store_last=True,
+                    properties=[
+                        ModelProperty(
+                            key=LABEL_PREDICATE,
+                            lang_literal_value=LangLiteral(
+                                value="Temperature status", lang="en"
+                            ),
+                        )
+                    ],
+                    values=[
+                        Value(
+                            label=OUTPUT_VALUE_LABEL,
+                            comment="Temperature status: normal or extreme",
+                            data_type=BasicDataTypes.STRING.value,
+                        )
+                    ],
+                )
+            ],
+        )
 
-    feed_api.create_feed(interaction_twin_id, OUTPUT_FEED_NAME)
-    feed_value = Value(
-        label=OUTPUT_VALUE_LABEL,
-        comment="Temperature status: normal or extreme",
-        data_type=BasicDataTypes.STRING.value,
-    )
-    feed_api.update_feed(
-        interaction_twin_id,
-        OUTPUT_FEED_NAME,
-        add_labels=[LangLiteral(lang="en", value="Temperature status")],
-        add_values=[feed_value],
-        store_last=True,
-    )
+        print("Interaction twin created")
 
-    print("Interaction twin created")
+        return interaction_twin_id
 
-    return interaction_twin_id
+    def follow_sensors(self, interaction_twin_id):
+        output_twins = []
 
+        print("Searching for output twins", end="", flush=True)
+        sleep(10)
 
-def create_model(agent_auth, api_factory):
-    twin_api = api_factory.get_twin_api()
-    feed_api = api_factory.get_feed_api()
+        while len(output_twins) < len(SENSORS_MAP):
+            output_twins = next(
+                self._search_api.search_twins(
+                    properties=[
+                        ModelProperty(
+                            key="https://data.iotics.com/app#model",
+                            uri_value=Uri(value=interaction_twin_id),
+                        )
+                    ]
+                )
+            ).twins
 
-    model_twin_id = agent_auth.make_twin_id("MachineModel")
+            sleep(10)
+            print(".", end="", flush=True)
 
-    twin_api.create_twin(model_twin_id)
-    twin_api.update_twin(
-        model_twin_id,
-        add_labels=[LangLiteral(lang="en", value="Machine model (tutorial)")],
-        new_visibility=Visibility.PUBLIC,
-        add_props=[MODEL_TYPE_PROPERTY, ALLOW_ALL_HOSTS_PROPERTY],
-        clear_all_props=True,
-    )
+        print(f"\nFound {len(output_twins)} output twins")
 
-    feed_api.create_feed(model_twin_id, SOURCE_FEED_NAME)
-    feed_val = Value(
-        label=SOURCE_VALUE_LABEL,
-        comment="Temperature in degrees Celsius",
-        unit="http://purl.obolibrary.org/obo/UO_0000027",
-        data_type=BasicDataTypes.DECIMAL.value,
-    )
-    feed_api.update_feed(
-        model_twin_id,
-        SOURCE_FEED_NAME,
-        add_labels=[LangLiteral(lang="en", value="Current temperature")],
-        add_values=[feed_val],
-        store_last=True,
-    )
+        for sensor in output_twins:
+            subscription_id = self._follow_api.subscribe_to_feed(
+                follower_twin_id=sensor.id.value,
+                followed_twin_id=sensor.id.value,
+                followed_feed_name=OUTPUT_FEED_NAME,
+                callback=self._follow_callback,
+            )
+            sensor_label = self._find_label(properties=sensor.properties)
 
-    print("Model twin created")
+            if sensor_label:
+                SUBSCRIPTIONS_MAP[subscription_id] = sensor_label
 
-    return model_twin_id
+    def get_sensor_data(self):
+        response = requests.get("http://flaskapi.dev.iotics.com/sensor_temp")
+        if response.status_code > 400:
+            print(f"Error {response.status_code} from API: {response.reason}")
 
+        return response.json()
 
-def get_sensor_data():
-    response = requests.get("http://flaskapi.dev.iotics.com/sensor_temp")
-    if response.status_code > 400:
-        print("Error %s from API: %s" % (response.status_code, response.reason))
+    def share_data(self, data):
+        for machine_number, sensor_data in enumerate(data):
+            machine_name = f"machine_{machine_number}"
+            machine_twin_id = SENSORS_MAP.get(machine_name)
+            if not machine_twin_id:
+                continue
 
-    return response.json()
+            self._publish_feed_value(
+                sensor_data,
+                twin_id=machine_twin_id,
+                feed_id=SOURCE_FEED_NAME,
+                twin_label=machine_name,
+            )
+
+    def _publish_feed_value(
+        self, sensor_data, twin_id, feed_id, print_data=True, twin_label=None
+    ):
+        data_to_share = {SOURCE_VALUE_LABEL: sensor_data["temp"]}
+        encoded_data = base64.b64encode(json.dumps(data_to_share).encode()).decode()
+
+        self._feed_api.share_feed_data(
+            twin_id, feed_id, data=encoded_data, mime="application/json"
+        )
+
+        if print_data:
+            print(f"Sharing data for {twin_label}: {data_to_share}")
+
+    def _follow_callback(self, sub_id, body):
+        sensor = SUBSCRIPTIONS_MAP[sub_id]
+        interaction_data = json.loads(
+            base64.b64decode(body.payload.feed_data.data).decode("ascii")
+        )
+
+        if interaction_data[OUTPUT_VALUE_LABEL] == "extreme":
+            print(f"{sensor}: SENSOR IS OVERHEATING! OH THE HUMANITY!!")
+
+    def _find_label(self, properties):
+        for prop in properties:
+            if prop.key == LABEL_PREDICATE:
+                return prop.lang_literal_value.value
+
+        return None
 
 
 def main():
-    agent_auth = AgentAuthBuilder.build_agent_auth(
-        resolver_url="<resolver url>",
-        user_seed="<from script output>",
-        user_key_name="<from script output>",
-        agent_seed="<from script output>",
-        agent_key_name="<from script output>",
-    )
-    api_factory = QApiFactory(
-        DataSourcesConfBase(
-            qapi_url="<from index.json>", qapi_stomp_url="<from index.json>"
-        ),
-        agent_auth,
-    )
+    tutorial = Tutorial()
+    tutorial.setup()
 
-    model_twin_id = create_model(agent_auth, api_factory)
-    data = get_sensor_data()
-    create_machine_from_model(data, agent_auth, api_factory)
-    interaction_twin_id = create_interaction(agent_auth, api_factory, model_twin_id)
-    follow_sensors(api_factory, interaction_twin_id)
+    model_twin_id = tutorial.create_model()
+    data = tutorial.get_sensor_data()
+    tutorial.create_machine_from_model(data)
+    interaction_twin_id = tutorial.create_interaction(model_twin_id)
+    tutorial.follow_sensors(interaction_twin_id)
 
     while True:
         print("\nGetting latest temperatures...")
-        data = get_sensor_data()
-        share_data(data, agent_auth, api_factory)
+        data = tutorial.get_sensor_data()
+        tutorial.share_data(data)
 
         sleep(5)
 
