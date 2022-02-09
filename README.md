@@ -1,4 +1,5 @@
 # iotics-host-lib
+
 Iotics host library - a library to aid integration with Iotics
 
 This library is a Python wrapper which abstracts calls to our Python `iotic.web.rest.client`, `iotic.web.stomp` and
@@ -33,24 +34,25 @@ running its program.
 Having created a working example using the cookiecutter, you could now obviously alter the generated code to integrate
 with your own data sources.
 
-
-## Create a new Iotics Connector with Cookiecutter
-
+eate a new Iotics Connector with Cookiecutter
 
 ### Requirements
+
 - Install Python, see  [__Installation__](https://www.python.org/downloads/)
 - Install Cookiecutter, see [__Installation__](https://cookiecutter.readthedocs.io/en/latest/installation.html)
 
-
 ### Create a template of a connector
+
 >Note: For Windows users in order for cookiecutter to complete the template creation, before running the command remove the `post_gen_project.py` from both follower_template and publisher_template in the `iotics-host-lib/builder/iotics/` directory.
 
 From `iotics-host-lib` root folder run the following command if you want to create a __Publisher__ template:
+
 ```shell
 cookiecutter builder/iotics/publisher_template/
 ```
 
 or run the following command if you want to create a __Follower__ template:
+
 ```shell
 cookiecutter builder/iotics/follower_template/
 ```
@@ -59,8 +61,8 @@ then follow instructions on terminal.
 
 >Note: To generate the default example with sample code, press the `Enter` key for all options without providing any input.
 
-
 ### Example of usage
+
 ```bash
 $ cookiecutter builder/iotics/publisher_template/
 
@@ -77,6 +79,7 @@ Choose from 1, 2 [1]:
 ```
 
 The following structure is created:
+
 ```bash
 ├── random-temp-pub
 │   ├── Dockerfile
@@ -102,17 +105,18 @@ The following structure is created:
 4 directories, 15 files
 ```
 
-
 ### Building and running
+
 Once you have created a Connector with the Cookiecutter the README.md in that connector's folder will guide you on
 building and running it.
 
-
 ### Monitoring and alerting
+
 For metrics, the library is using [Prometheus'](https://prometheus.io/docs/introduction/overview/) official
 [Python client](https://github.com/prometheus/client_python). The following describes an example of how to monitor your
 component locally. After your components are set up to expose endpoints to scrape (see READMEs of the generated
 Connectors for more details), create `prometheus.yml` config file:
+
 ```yaml
 # https://prometheus.io/docs/prometheus/latest/configuration/configuration/#configuration-file
 global:
@@ -150,25 +154,30 @@ scrape_configs:
 ```
 
 Next you can start Prometheus server locally with e.g.:
+
 ```bash
 docker run --rm --name prometheus --network host -v"$(realpath ./prometheus.yml)":/prometheus/prometheus.yml prom/prometheus --web.listen-address=:9101
 ```
 
 Note that:
-* if you remove `--rm` flag you can persist the data after stopping the container and restart it with:
+
+- if you remove `--rm` flag you can persist the data after stopping the container and restart it with:
+
   ```bash
   docker start -a prometheus
   ```
-* `--network host` usage is not recommended on a production environment
+
+- `--network host` usage is not recommended on a production environment
   ([additional info](https://docs.docker.com/network/host/));
-* if the default Prometheus port (`9090`) is already being used, you can change it with the argument from the end:  
+- if the default Prometheus port (`9090`) is already being used, you can change it with the argument from the end:  
   `--web.listen-address=:9101` but that will change the config file it uses
   from `/etc/prometheus/prometheus.yml` to `/prometheus/prometheus.yml`.
 
-
 #### Data visualisation
+
 For data visualisation and export we recommend trying out Grafana's 
 [Docker](https://grafana.com/grafana/download?pg=get&platform=docker&plcmt=selfmanaged-box1-cta1) image:
+
 ```bash
 docker run --rm --name grafana --network host grafana/grafana
 ```
@@ -181,23 +190,25 @@ In the "URL" field paste `http://localhost:9101` and press "Save & Test", you sh
 if everything is set up correctly.
 
 In the "Explore" view you can use for example the following queries to see Random Temperature Connectors:
-* general metrics of Random Temperature Publisher and Follower (per-second rate):  
+
+- general metrics of Random Temperature Publisher and Follower (per-second rate):  
   `rate(api_call_count{job=~"random-temp-.*"}[1m])`
   ([link](http://localhost:3000/explore?orgId=1&left=%5B%22now-1h%22,%22now%22,%22Prometheus%22,%7B%22exemplar%22:true,%22expr%22:%22rate(api_call_count%7Bjob%3D~%5C%22random-temp-.*%5C%22%7D%5B1m%5D)%22,%22requestId%22:%22Q-1a2a6156-415b-42fa-98b1-6fd3c18be6ee-0A%22%7D%5D));
-* Random Temperature Publisher number of feed publishes that failed as measured over the last minute:  
+- Random Temperature Publisher number of feed publishes that failed as measured over the last minute:  
   `increase(api_call_count{job="random-temp-pub", function="share_feed_data", failed="True"}[1m])`
   ([link](http://localhost:3000/explore?orgId=1&left=%5B%22now-1h%22,%22now%22,%22Prometheus%22,%7B%22exemplar%22:true,%22expr%22:%22increase(api_call_count%7Bjob%3D%5C%22random-temp-pub%5C%22,%20function%3D%5C%22share_feed_data%5C%22,%20failed%3D%5C%22True%5C%22%7D%5B1m%5D)%22,%22requestId%22:%22Q-7830e1fd-158f-4b22-8f89-707bb8b83547-0A%22%7D%5D)).
 
-
-#### OSX notes:
+#### OSX notes
 
 The `--network host` flag is not supported on Docker Desktop for Mac.
 
 Instead you can : -
-* Run prometheus: - `docker run -p 9101:9090 --rm --name prometheus -v"$(realpath ./prometheus.yml)":/prometheus/prometheus.yml prom/prometheus:latest --config.file=/prometheus/prometheus.yml`
-* Run grafana: - `docker run --rm --name grafana -p 3000:3000 grafana/grafana`
-* When configuring the prometheus datasource in grafana set the URL to `http://docker.for.mac.host.internal:9101`
-* Make the prometheus configuration file point to host using `docker.for.mac.host.internal`
+
+- Run prometheus: - `docker run -p 9101:9090 --rm --name prometheus -v"$(realpath ./prometheus.yml)":/prometheus/prometheus.yml prom/prometheus:latest --config.file=/prometheus/prometheus.yml`
+- Run grafana: - `docker run --rm --name grafana -p 3000:3000 grafana/grafana`
+- When configuring the prometheus datasource in grafana set the URL to `http://docker.for.mac.host.internal:9101`
+- Make the prometheus configuration file point to host using `docker.for.mac.host.internal`
+
 ```yaml
 ...
 scrape_configs:
@@ -218,13 +229,12 @@ scrape_configs:
     - targets: ['docker.for.mac.host.internal:8002']
 ```
 
-
 ## Testing FAQ
 
-* When running `make unit-tests` in the top level of this repo you can get the error `AssertionError: assert 'Max retries exceeded with' in ''` if you are running the iotics host locally. The solution is to run `make docker-clean-test` on the local host and the tests should all pass.
-
+- When running `make unit-tests` in the top level of this repo you can get the error `AssertionError: assert 'Max retries exceeded with' in ''` if you are running the iotics host locally. The solution is to run `make docker-clean-test` on the local host and the tests should all pass.
 
 ## Iotics host common library
+
 Version compatibility with Iotics host:
 
 | iotics-host-lib | iotics-host |
@@ -233,7 +243,19 @@ Version compatibility with Iotics host:
 | `>=3.0` | `>=2.0.350` |
 | `>=7.0` | `>=3.0.692` |
 
-
 ## Iotics Internal Links
+
 [Build Status](https://build.cor.corp.iotic/go/pipeline/activity/iotics-host-lib)  
 [![Built with Mage](https://magefile.org/badge.svg)](https://magefile.org)
+
+## Versioning
+
+The version is stored in a `VERSION` file. This matches the Git tag version.
+
+### Updating Versions for Releases
+
+After a new release is built:
+
+- Update the `VERSION` file to contain the right version
+- Git tag the code and push the tag to GitHub
+- Update release notes in Confluence - create a new Blog post
