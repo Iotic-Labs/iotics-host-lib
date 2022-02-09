@@ -34,7 +34,7 @@ running its program.
 Having created a working example using the cookiecutter, you could now obviously alter the generated code to integrate
 with your own data sources.
 
-eate a new Iotics Connector with Cookiecutter
+## Create a new Iotics Connector with Cookiecutter
 
 ### Requirements
 
