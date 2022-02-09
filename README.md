@@ -4,7 +4,6 @@ Iotics host library - a library to aid integration with Iotics
 
 This library is a Python wrapper which abstracts calls to our Python `iotic.web.rest.client`, `iotic.web.stomp` and `iotic.lib.identity` client libraries. Note: the REST and STOMP interfaces can instead be used directly to integrate with Iotics if preferred, e.g. if using another language other than Python.
 
-
 In addition this library also provides a way for developers to generate boilerplate code for what Iotics call Connectors, by using [Cookiecutter](https://cookiecutter.readthedocs.io/en/latest/README.html). Connectors are what we call components that push/publish data into Iotics (a type of Connector called a __Publisher__) or receive/follow data out of Iotics (a type of Connector called a __Follower__).
 
 By the end of following the steps in this README and selecting to add example code, then next following the steps in the READMEs of the generated Connectors, you will have created and run a fully functioning example. This example demonstrates the basics of publishing data into Iotics and receiving data out of Iotics.
@@ -15,14 +14,12 @@ The symmetry of the publisher and the follower having their own twins allows the
 
 Having created a working example using the cookiecutter, you could now obviously alter the generated code to integrate with your own data sources.
 
-
 ## Create a new Iotics Connector with Cookiecutter
 
 ### Requirements
 
 Install Cookiecutter, see [__Installation__](https://cookiecutter.readthedocs.io/en/latest/installation.html)
 Docker to run ioticsctl utility to create keys, see [__Installation__](https://docs.docker.com/get-docker/)
-
 
 ### Create a template of a connector
 
@@ -56,6 +53,7 @@ Select add_example_code:
 2 - NO
 Choose from 1, 2 [1]: 1
 ```
+
 The following structure is created:
 
 ```bash
@@ -83,13 +81,12 @@ The following structure is created:
 4 directories, 15 files
 ```
 
-
 ### Building and running
 
 Once you have created a Connector with the Cookiecutter the README.md in that connector's folder will guide you on building and running it.
 
-
 #### Iotics host common library
+
 Version compatibility with Iotics host:
 
 | iotics-host-lib | iotics-host |
@@ -97,9 +94,20 @@ Version compatibility with Iotics host:
 | `>=2.0.11` | `~=1.1` |
 | `>=3.0` | `>=2.0.350` |
 
-
 ## Iotics Internal Links
 
 [Build Status](https://build.cor.corp.iotic/go/pipeline/activity/iotics-host-lib)
 
 [![Built with Mage](https://magefile.org/badge.svg)](https://magefile.org)
+
+## Versioning
+
+The version is stored in a `VERSION` file. This matches the Git tag version.
+
+### Updating Versions for Releases
+
+After a new release is built:
+
+* Update the `VERSION` file to contain the right version
+* Git tag the code and push the tag to GitHub
+* Update release notes in Confluence - create a new Blog post
