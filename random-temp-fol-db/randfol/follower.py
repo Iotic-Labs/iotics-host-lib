@@ -15,9 +15,13 @@ from iotics.host.exceptions import (
 )
 
 from randfol.conf import RandomTempFollowerConf
+from randfol.dbengine.csv import CSV
 from randfol.exceptions import RandomTempFollowerBaseException
 
-from .dbengine.sqlite import SensorReading, SQLite
+from .dbengine.csv import CSV
+from .dbengine.csv import SensorReading as SR_CSV
+from .dbengine.sqlite import SensorReading as SR_SQLITE
+from .dbengine.sqlite import SQLite
 
 logger = logging.getLogger(__name__)
 # turn down stomp logging
@@ -42,7 +46,8 @@ class RandomTempFollower:
         self.agent_auth = agent_auth
         self.loop_time = update_frequency_seconds
         self.follower_twin_id = None
-        self.db_handler = SQLite()
+        self.sqlite_db_handler = SQLite()
+        self.csv_db_handler = CSV()
 
     def create_follower_twin(self):
         twin_id = self.agent_auth.make_twin_id("RandomTempFollower")
@@ -58,11 +63,17 @@ class RandomTempFollower:
 
         logger.info("Received temperature data %s at time %s", reading, timestamp)
 
-        sensor_reading = SensorReading(
+        # Store into an SQLite DB
+        sensor_reading_sqlite = SR_SQLITE(
             timestamp=timestamp, sensor_id=sensor_id, reading_value=temperature
         )
+        self.sqlite_db_handler.store(sensor_reading_sqlite)
 
-        self.db_handler.store(sensor_reading)
+        # Store into a CSV file
+        sensor_reading_csv = SR_CSV(
+            timestamp=timestamp, sensor_id=sensor_id, reading_value=temperature
+        )
+        self.csv_db_handler.store(sensor_reading_csv)
 
     def get_most_recent_data(self, followed_twin_id: str, feed_id: str):
         """Get feed's most recent data via the InterestApi
