@@ -52,8 +52,8 @@ class TwinApi:
             client_ref (str, optional): to be deprecated, must be unique for each request
             transaction_ref (str, optional): Used to loosely link requests/responses in a distributed env't. Max 36 char
 
-        Returns: ListAllTwinsResponsePayload, whose sole attribute `twins` is a list of Twin objects containing id and
-            visibility
+        Returns: ListAllTwinsResponsePayload, whose sole attribute `twins` is a list of ListAllTwinsResponseTwinDetails
+         objects containing the twin details
 
         """
         return self.rest_api_client.list_all_twins(
