@@ -249,14 +249,11 @@ Version compatibility with Iotics host:
 [Build Status](https://build.cor.corp.iotic/go/pipeline/activity/iotics-host-lib)  
 [![Built with Mage](https://magefile.org/badge.svg)](https://magefile.org)
 
-## Versioning
+## Release Process
 
-The version is stored in a `VERSION` file. This matches the Git tag version.
+- Before merging the new change to master, set the new version major or minor numbers in 2 places [here](https://github.com/Iotic-Labs/dev-gocd-pipelines/blob/aeb1d3c3ac2b308697247bbe5d53b63264dfa271/iotics-host-lib.gocd.yaml#L5) and [here](https://github.com/Iotic-Labs/dev-gocd-pipelines/blob/aeb1d3c3ac2b308697247bbe5d53b63264dfa271/iotics-host-lib.gocd.yaml#L106) in the pipeline file, and merge the changed pipeline file to main.
+    - Use [semantic versioning](https://semver.org/); when there is a breaking change increase the first (major) number. When there are compatible non breaking changes increase the second (minor) number. For backwards compatible bug fixes the third (patch) number will be increased automatically by the {count} in the pipeline file.
+- When you merge the host-lib change into master then the pipeline will create a new version on nexus [here](https://nexus.cor.corp.iotic/#browse/browse:py-internal:iotics-host-lib-sources). Download this new version and add it and any other iotics dependency changes (e.g. iotic.web.rest.client - also download from nexus) to the [deps folder](https://github.com/Iotic-Labs/iotics-host-lib/tree/master/deps) and remove any older versions and dependencies.
+- The pipeline automatically tags the master branch with the version number after it has run. However you need to manually update the version number in the VERSION file to match this tag to be the same as the version of the host lib you have put in the deps folder.
+- Create a release note blog post by pressing on the + sign next to Blogs on the lhs [here](https://ioticlabs.atlassian.net/wiki/spaces/RN/overview), making sure to add the `iotic-host-lib` label, adding this label will then also create an entry [here](https://ioticlabs.atlassian.net/wiki/spaces/RN/pages/439025665/iotics-host-lib+Release+Notes), as well as the blog post. Note blog post and release notes are internal, documentation like [this](https://docs.iotics.com/docs/changes-to-list_all_twins-effective-22-february-2022) should be created if necessary for external use.
 
-### Updating Versions for Releases
-
-After a new release is built:
-
-- Update the `VERSION` file to contain the right version
-- Git tag the code and push the tag to GitHub
-- Update release notes in Confluence - create a new Blog post
