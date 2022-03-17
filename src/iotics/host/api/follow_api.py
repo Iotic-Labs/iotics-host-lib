@@ -83,7 +83,7 @@ class FollowStompListener(ConnectionListener):
             self._message_handler(headers, deserialised_resp)
 
     def on_error(self, headers: dict, body):
-        logger.error('Received stomp error body: %s headers: %s', body, headers)
+        level = logging.ERROR
         try:
             # This will be improved once https://ioticlabs.atlassian.net/browse/FO-1889 will be done
             error = get_stomp_error_message(body) or 'No error body'
@@ -91,8 +91,13 @@ class FollowStompListener(ConnectionListener):
                     'UNAUTHENTICATED: token expired', 'The connection frame does not contain valid credentials.'
             ):
                 self.regenerate_token = True
+                level = logging.DEBUG
         except Exception as ex:  # pylint: disable=broad-except
             error = 'Deserialization error: %s' % ex
+
+        logger.log(level, 'Received stomp error body: %s headers: %s', body, headers)
+        if self.regenerate_token:
+            logger.debug('Will try reconnecting with new token')
         self.errors[headers['receipt-id']] = error
 
     def on_receipt(self, headers: dict, body):

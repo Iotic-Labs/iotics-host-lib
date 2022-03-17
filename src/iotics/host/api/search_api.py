@@ -99,7 +99,7 @@ class SearchStompListener(ConnectionListener):
         self.receipts.add(headers['receipt-id'])
 
     def on_error(self, headers: dict, body):
-        logger.error('Received search stomp error body: %s headers: %s', body, headers)
+        level = logging.ERROR
         try:
             # This will be improved once https://ioticlabs.atlassian.net/browse/FO-1889 will be done
             error = get_stomp_error_message(body) or 'No error body'
@@ -107,9 +107,13 @@ class SearchStompListener(ConnectionListener):
                     'UNAUTHENTICATED: token expired', 'The connection frame does not contain valid credentials.'
             ):
                 self.regenerate_token = True
+                level = logging.DEBUG
         except Exception as ex:  # pylint: disable=broad-except
             error = 'Deserialization error: %s' % ex
 
+        logger.log(level, 'Received search stomp error body: %s headers: %s', body, headers)
+        if self.regenerate_token:
+            logger.debug('Will try reconnecting with new token')
         # get tx_ref. Note that the subscription shared across all searches doesn't have a page
         tx_ref, _, _ = headers[TXREF_HEADER].partition('_page')
         self.errors[tx_ref].append(error)
