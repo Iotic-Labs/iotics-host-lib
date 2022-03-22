@@ -29,7 +29,7 @@ from stomp import ConnectionListener
 from stomp.exception import StompException
 
 from iotics.host import metrics
-from iotics.host.api.utils import deserialize, ListOrTuple, sanitize_for_serialization, get_stomp_error_message
+from iotics.host.api.utils import deserialize, ListOrTuple, sanitize_for_serialization
 from iotics.host.auth import AgentAuth
 from iotics.host.conf.base import DataSourcesConfBase
 from iotics.host.exceptions import DataSourcesQApiError, DataSourcesSearchTimeout, DataSourcesStompError, \
@@ -101,35 +101,34 @@ class SearchStompListener(ConnectionListener):
     def on_error(self, headers: dict, body):
         level = logging.ERROR
         try:
-            # This will be improved once https://ioticlabs.atlassian.net/browse/FO-1889 will be done
-            error = get_stomp_error_message(body) or 'No error body'
-            if error in (
-                    'UNAUTHENTICATED: token expired', 'The connection frame does not contain valid credentials.'
-            ):
+            error = json.loads(body)
+            message = error.get('message', 'No error message')
+            if error.get('code') == 16:
                 self.regenerate_token = True
                 level = logging.DEBUG
         except Exception as ex:  # pylint: disable=broad-except
-            error = 'Deserialization error: %s' % ex
+            message = 'Deserialization error: %s' % ex
 
         logger.log(level, 'Received search stomp error body: %s headers: %s', body, headers)
         if self.regenerate_token:
             logger.debug('Will try reconnecting with new token')
         # get tx_ref. Note that the subscription shared across all searches doesn't have a page
         tx_ref, _, _ = headers[TXREF_HEADER].partition('_page')
-        self.errors[tx_ref].append(error)
+        self.errors[tx_ref].append(message)
 
     def on_connected(self, headers: dict, body):
         logger.info('Stomp Search connected %s, %s', headers, body)
 
     def on_disconnected(self):
-        logger.warning('Stomp Search disconnected')
         if self._disconnect_handler:
-            logger.debug('Attempting reconnect in 1s')
+            logger.debug('Stomp search disconnected, attempting reconnect in 1s')
             sleep(1)
             try:
                 self._disconnect_handler()
             except Exception as ex:
                 raise DataSourcesStompNotConnected(ex) from ex
+        else:
+            logger.warning('Stomp Search disconnected')
 
 
 class SearchAPI:
