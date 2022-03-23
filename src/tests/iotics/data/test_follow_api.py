@@ -39,18 +39,18 @@ def test_should_raise_error_if_stomp_not_connected():
 
 
 class ErroringStompConnection(MockStompConnection):
-    error = 'foo'
+    code = 2
 
     def subscribe(self, destination, headers=None, **kwargs):
         try:
             headers['receipt-id'] = headers.pop('receipt')
         except KeyError:
             pass
-        self.listener.on_error(headers, '{"error":"%s"}' % self.error)
+        self.listener.on_error(headers, '{"code":%d, "message": "Oh noes"}' % self.code)
 
 
 class AuthExpiredStompConnection(ErroringStompConnection):
-    error = 'UNAUTHENTICATED: token expired'
+    code = 16
 
 
 def test_should_raise_error_if_stomp_error():
