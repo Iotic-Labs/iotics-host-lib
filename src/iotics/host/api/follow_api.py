@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
 import logging
 from functools import partial
 from time import sleep
@@ -24,7 +25,7 @@ from stomp import ConnectionListener
 from stomp.exception import StompException
 
 from iotics.host import metrics
-from iotics.host.api.utils import deserialize, get_stomp_error_message
+from iotics.host.api.utils import deserialize
 from iotics.host.auth import AgentAuth
 from iotics.host.conf.base import DataSourcesConfBase
 from iotics.host.exceptions import DataSourcesFollowTimeout, DataSourcesStompError, DataSourcesStompNotConnected
@@ -51,14 +52,15 @@ class FollowStompListener(ConnectionListener):
         logger.info('Stomp Follow connected %s, %s', headers, body)
 
     def on_disconnected(self):
-        logger.warning('Stomp Follow disconnected')
         if self._disconnect_handler:
-            logger.debug('Attempting reconnect in 1s')
+            logger.debug('Stomp follow disconnected, attempting reconnect in 1s')
             sleep(1)
             try:
                 self._disconnect_handler()
             except Exception as ex:
                 raise DataSourcesStompNotConnected(ex) from ex
+        else:
+            logger.warning('Stomp Follow disconnected')
 
     @staticmethod
     def to_interest_fetch_response(headers: dict, body) -> FetchInterestResponse:
@@ -83,17 +85,20 @@ class FollowStompListener(ConnectionListener):
             self._message_handler(headers, deserialised_resp)
 
     def on_error(self, headers: dict, body):
-        logger.error('Received stomp error body: %s headers: %s', body, headers)
+        level = logging.ERROR
         try:
-            # This will be improved once https://ioticlabs.atlassian.net/browse/FO-1889 will be done
-            error = get_stomp_error_message(body) or 'No error body'
-            if error in (
-                    'UNAUTHENTICATED: token expired', 'The connection frame does not contain valid credentials.'
-            ):
+            error = json.loads(body)
+            message = error.get('message', 'No error message')
+            if error.get('code') == 16:
                 self.regenerate_token = True
+                level = logging.DEBUG
         except Exception as ex:  # pylint: disable=broad-except
-            error = 'Deserialization error: %s' % ex
-        self.errors[headers['receipt-id']] = error
+            message = 'Deserialization error: %s' % ex
+
+        logger.log(level, 'Received stomp error body: %s headers: %s', body, headers)
+        if self.regenerate_token:
+            logger.debug('Will try reconnecting with new token')
+        self.errors[headers['receipt-id']] = message
 
     def on_receipt(self, headers: dict, body):
         self.receipts.add(headers['receipt-id'])
