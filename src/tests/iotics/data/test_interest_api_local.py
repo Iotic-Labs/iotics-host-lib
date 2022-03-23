@@ -27,9 +27,8 @@ def test_should_get_a_interest_api():
 
 def test_should_raise_qapi_error_if_connection_error():
     api = QApiFactory(ConfTest(), AgentAuthTest()).get_interest_api()
-    with pytest.raises(DataSourcesQApiError) as error:
+    with pytest.raises(DataSourcesQApiError):
         api.get_feed_last_stored_local('follower_twin_id', 'followed_twin_id', 'feed_id')
-    assert 'Max retries exceeded with' in str(error.value)
 
 
 @pytest.mark.parametrize(
@@ -47,9 +46,8 @@ def test_should_raise_qapi_error_if_missing_param(arguments, missing_param):
 
 def test_should_raise_qapi_http_error_if_http_error(api_exception):
     api = InterestApi(InterestClient(api_client=FakeApiClient(error=api_exception)), client_app_id='app1')
-    with pytest.raises(DataSourcesQApiHttpError) as error:
+    with pytest.raises(DataSourcesQApiHttpError):
         api.get_feed_last_stored_local('follower_twin_id', 'did:iotics:e1', 'feed_id')
-    assert '' in str(error.value)
 
 
 def get_test_interest_api():
