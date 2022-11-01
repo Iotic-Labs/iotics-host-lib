@@ -1,6 +1,6 @@
 # Stomp-Client
 
-This repository contains the source for the IOTICS stomp client & generated REST client objects.
+This repository contains the source for the IOTICS stomp client.
 
 Until the upstream `stomp.py` [next release](https://github.com/jasonrbriggs/stomp.py/blob/0c9d45c6391555d1a462d1ee2cfff95d03aaa871/CHANGELOG.md?plain=1#L6), which contains a websocket implementation, is available, the IOTICS stomp client can be used instead.
 
